@@ -14,6 +14,7 @@ workspace = true
 formcraft-engine = { workspace = true }
 formcraft-render = { workspace = true }
 formcraft-tess = { workspace = true }
+formcraft-sketch = { workspace = true }
 formcraft-kernel = { workspace = true }
 egui = { workspace = true }
 egui-wgpu = { workspace = true }

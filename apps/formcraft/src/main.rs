@@ -25,6 +25,7 @@ fn main() -> ExitCode {
             "--view" => opts.view = args.next(),
             "--script" => opts.script = args.next().map(Into::into),
             "--dialog" => opts.dialog = args.next(),
+            "--edit" => opts.edit = args.next(),
             "--theme" => {
                 opts.theme = match args.next().as_deref() {
                     Some("light") => Some(ThemeKind::Light),

@@ -4,6 +4,7 @@ use egui::{Event, Modifiers, MouseWheelUnit, PointerButton, Pos2, TouchPhase, Ve
 use egui_kittest::Harness;
 
 use super::*;
+use crate::sketch_mode::Tool;
 
 const SIZE: Vec2 = Vec2::new(1440.0, 900.0);
 
@@ -170,4 +171,61 @@ fn clicking_the_canvas_picks_faces() {
     let empty = h.state().canvas_rect.left_top() + Vec2::new(20.0, 200.0);
     click(&mut h, empty);
     assert!(h.state_mut().session().selection().items.is_empty());
+}
+
+/// Screen position of a point on the active sketch plane.
+fn sketch_px(h: &Harness<'_, FormCraftApp>, x: f64, y: f64) -> Pos2 {
+    let app = h.state();
+    let m = app.sketch_mode.as_ref().unwrap();
+    let r = app.session.model().sketch(m.sketch).unwrap();
+    let rect = app.canvas_rect;
+    let size = DVec2::new(rect.width() as f64, rect.height() as f64);
+    let s = app.camera.project(r.plane.to_world(formcraft_kernel::DVec2::new(x, y)), size).unwrap();
+    rect.min + Vec2::new(s.x as f32, s.y as f32)
+}
+
+#[test]
+fn drawing_in_sketch_mode() {
+    let mut h = harness();
+    h.state_mut().create_sketch(serde_json::json!("XY"));
+    h.state_mut().camera.distance = 400.0;
+    h.state_mut().camera.target = DVec3::new(70.0, 15.0, 0.0);
+    h.run_steps(3);
+    assert!(h.state().sketch_mode.is_some());
+    // Rectangle: two clicks.
+    h.state_mut().sketch_mode.as_mut().unwrap().set_tool(Tool::Rectangle);
+    let (a, b) = (sketch_px(&h, 0.0, 0.0), sketch_px(&h, 40.0, 30.0));
+    click(&mut h, a);
+    click(&mut h, b);
+    let id = h.state().sketch_mode.as_ref().unwrap().sketch;
+    let regions = h.state().session.model().sketch(id).unwrap().regions.len();
+    assert_eq!(regions, 1, "{}", h.state().status);
+    // Triangle by a closed line chain to the right of it.
+    h.state_mut().sketch_mode.as_mut().unwrap().set_tool(Tool::Line);
+    for (x, y) in [(60.0, 0.0), (90.0, 0.0), (75.0, 25.0), (60.0, 0.0)] {
+        let p = sketch_px(&h, x, y);
+        click(&mut h, p);
+    }
+    let r = h.state().session.model().sketch(id).unwrap();
+    assert_eq!(r.regions.len(), 2, "{}", h.state().status);
+    // Dimension the rectangle's bottom edge: 50 mm.
+    h.state_mut().sketch_mode.as_mut().unwrap().set_tool(Tool::Dimension);
+    let p = sketch_px(&h, 20.0, 0.0);
+    click(&mut h, p);
+    for c in "50".chars() {
+        h.event(Event::Text(c.to_string()));
+    }
+    // clear the prefilled value first: select all + type is fiddly in tests, so set it directly
+    h.event(Event::Key {
+        key: egui::Key::Enter,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.run_steps(3);
+    h.state_mut().finish_sketch();
+    h.state_mut().session().execute("solid.extrude", &serde_json::json!({"distance": 5})).unwrap();
+    assert_eq!(h.state_mut().session().model().bodies.len(), 1);
+    assert!(h.state().sketch_mode.is_none());
 }

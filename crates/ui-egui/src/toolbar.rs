@@ -126,6 +126,7 @@ pub enum Action {
 /// UI-level commands handled by the shell itself (not engine commands).
 pub fn is_ui_command(id: &str) -> bool {
     matches!(id, "tools.text_commands" | "tools.settings")
+        || (id.starts_with("sketch.") && id != "sketch.edit" && id != "sketch.get")
 }
 
 fn enabled(reg: &Registry, id: &str) -> bool {

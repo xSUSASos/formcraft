@@ -59,6 +59,13 @@ fn apply(s: &mut Sketch, op: &Value) -> Result<Vec<u32>> {
             let a = point(s, op, "a")?;
             let b = point(s, op, "b")?;
             let l = e(s.add_line(a, b))?;
+            // Inferred constraints from interactive drawing.
+            if op.get("horizontal").and_then(Value::as_bool) == Some(true) {
+                s.add_constraint(Constraint::Horizontal { line: l }).map_err(|e| bad(e.to_string()))?;
+            }
+            if op.get("vertical").and_then(Value::as_bool) == Some(true) {
+                s.add_constraint(Constraint::Vertical { line: l }).map_err(|e| bad(e.to_string()))?;
+            }
             vec![a.0, b.0, l.0]
         }
         "rectangle" => {

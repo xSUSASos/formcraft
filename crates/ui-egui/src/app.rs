@@ -17,6 +17,7 @@ use serde_json::Value;
 use crate::dialog::{FeatureDialog, Outcome};
 use crate::icons;
 use crate::layout::{Dock, Layout, VisualStyle};
+use crate::sketch_mode::{Request, SketchMode, Tool};
 use crate::theme::{ThemeKind, Tokens};
 use crate::timeline;
 use crate::toolbar::{self, Action};
@@ -45,6 +46,8 @@ pub struct AppOptions {
     pub script: Option<PathBuf>,
     /// Open the dialog of this command at startup (screenshots).
     pub dialog: Option<String>,
+    /// Edit this feature (by name) at startup: its dialog, or sketch mode for a sketch.
+    pub edit: Option<String>,
 }
 
 /// Browser tree visibility toggles (Origin and bodies get real items in Phase 2).
@@ -93,6 +96,8 @@ pub struct FormCraftApp {
     preview: Option<(formcraft_engine::regen::Model, u64)>,
     preview_counter: u64,
     rename: Option<(FeatureId, String)>,
+    sketch_mode: Option<SketchMode>,
+    plane_picker: bool,
 }
 
 impl FormCraftApp {
@@ -147,6 +152,8 @@ impl FormCraftApp {
             preview: None,
             preview_counter: 0,
             rename: None,
+            sketch_mode: None,
+            plane_picker: false,
         };
         if let Some(path) = app.options.script.clone() {
             app.run_script_file(&path);
@@ -160,6 +167,12 @@ impl FormCraftApp {
         }
         if let Some(d) = app.options.dialog.clone() {
             app.open_dialog(&d, &Value::Null, None);
+        }
+        if let Some(name) = app.options.edit.clone() {
+            match app.session.document().features.iter().find(|f| f.name == name).map(|f| f.id) {
+                Some(id) => app.edit_feature(id),
+                None => app.status = format!("no feature named {name}"),
+            }
         }
         app
     }
@@ -209,6 +222,9 @@ impl FormCraftApp {
             }
             _ => {}
         }
+        if params.is_null() && self.sketch_command(id) {
+            return;
+        }
         // Toolbar/menu invocation of a modelling command with parameters opens its dialog.
         if params.is_null() && self.wants_dialog(id) {
             self.open_dialog(id, &serde_json::json!({}), None);
@@ -220,6 +236,173 @@ impl FormCraftApp {
             }
             Err(e) => format!("{id}: {e}"),
         };
+    }
+
+    /// Sketch environment commands from the toolbar and shortcuts. Returns true when handled.
+    fn sketch_command(&mut self, id: &str) -> bool {
+        match id {
+            "sketch.create" => {
+                self.plane_picker = true;
+                true
+            }
+            "sketch.finish" => {
+                self.finish_sketch();
+                true
+            }
+            _ if id.starts_with("sketch.") && id != "sketch.edit" && id != "sketch.get" => {
+                match (&mut self.sketch_mode, Tool::from_command(id)) {
+                    (Some(m), Some(tool)) => {
+                        m.set_tool(tool);
+                        self.status = format!("Sketch: {id}");
+                    }
+                    (Some(_), None) => {
+                        self.status = "Select sketch entities, then pick the constraint in the Sketch Palette".into()
+                    }
+                    (None, _) => {
+                        self.status = "Create a sketch first (Create Sketch, then pick a plane)".into();
+                        self.plane_picker = true;
+                    }
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn enter_sketch(&mut self, id: FeatureId) {
+        if let Some(r) = self.session.model().sketch(id) {
+            SketchMode::look_at(&r.plane, &mut self.camera);
+            self.camera.projection = Projection::Orthographic;
+            // Frame the sketch (or 100 mm around its origin when empty).
+            let mut bb = formcraft_kernel::Aabb::empty();
+            for (_, e) in &r.sketch.entities {
+                match e {
+                    formcraft_sketch::Entity::Point { x, y } => {
+                        bb.grow(r.plane.to_world(formcraft_kernel::DVec2::new(*x, *y)))
+                    }
+                    formcraft_sketch::Entity::Circle { center, radius, .. } => {
+                        if let Ok((x, y)) = r.sketch.point(*center) {
+                            for (dx, dy) in [(-1.0, -1.0), (1.0, 1.0)] {
+                                bb.grow(
+                                    r.plane.to_world(formcraft_kernel::DVec2::new(x + dx * radius, y + dy * radius)),
+                                );
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if bb.is_empty() || bb.size().length() < 1e-6 {
+                bb = formcraft_kernel::Aabb {
+                    min: r.plane.origin - DVec3::splat(50.0),
+                    max: r.plane.origin + DVec3::splat(50.0),
+                };
+            }
+            let pad = bb.size() * 0.25;
+            self.camera.fit(bb.min - pad, bb.max + pad, 1.6);
+        }
+        self.sketch_mode = Some(SketchMode::new(id));
+        self.tab = "Sketch".into();
+        self.session.selection_mut().clear();
+        self.status = "Sketch: L line, R rectangle, C circle, D dimension, Esc select".into();
+    }
+
+    fn finish_sketch(&mut self) {
+        if self.sketch_mode.take().is_some() {
+            self.tab = "Solid".into();
+            self.camera.projection = Projection::Perspective;
+            self.camera.look_from(DVec3::new(1.0, -1.0, 1.0));
+            self.status = "Sketch finished".into();
+        }
+    }
+
+    fn create_sketch(&mut self, plane: Value) {
+        match self.session.execute("sketch.create", &serde_json::json!({"plane": plane})) {
+            Ok(v) => {
+                if let Some(id) = v.get("feature").and_then(Value::as_u64) {
+                    self.enter_sketch(FeatureId(id as u32));
+                }
+            }
+            Err(e) => self.status = format!("Create Sketch: {e}"),
+        }
+    }
+
+    fn plane_picker_ui(&mut self, ui: &mut Ui) {
+        if !self.plane_picker {
+            return;
+        }
+        let face = self.session.selection().items.iter().find_map(|p| match p {
+            Pick::Face { body, index } => Some((*body, *index)),
+            _ => None,
+        });
+        let mut choice: Option<Value> = None;
+        let mut open = true;
+        egui::Window::new("Create Sketch")
+            .id(Id::new("plane_picker"))
+            .collapsible(false)
+            .resizable(false)
+            .anchor(Align2::RIGHT_TOP, Vec2::new(-12.0, 300.0))
+            .open(&mut open)
+            .show(ui.ctx(), |ui| {
+                ui.label("Select a plane:");
+                for (name, tip) in [("XY", "Top (ground)"), ("XZ", "Front"), ("YZ", "Right")] {
+                    if ui.button(format!("{name} plane")).on_hover_text(tip).clicked() {
+                        choice = Some(serde_json::json!(name));
+                    }
+                }
+                let label = if face.is_some() { "Selected face" } else { "Selected face (select a planar face first)" };
+                if ui.add_enabled(face.is_some(), egui::Button::new(label)).clicked()
+                    && let Some((body, index)) = face
+                    && let Some(b) = self.session.model().body(body)
+                    && let Some(fi) = self.session.kernel().faces(&b.shape).ok().and_then(|v| v.into_iter().find(|f| f.index == index))
+                {
+                    choice = Some(serde_json::json!({"body": body.0, "face": {"face": formcraft_engine::regen::select::face_signature(&fi)}}));
+                }
+            });
+        if let Some(c) = choice {
+            self.plane_picker = false;
+            self.create_sketch(c);
+        } else if !open {
+            self.plane_picker = false;
+        }
+    }
+
+    fn sketch_palette(&mut self, ui: &mut Ui, t: &Tokens) {
+        let Some(mut m) = self.sketch_mode.take() else { return };
+        let mut req = Request::None;
+        egui::Window::new("Sketch Palette")
+            .id(Id::new("sketch_palette"))
+            .title_bar(false)
+            .anchor(Align2::RIGHT_TOP, Vec2::new(-12.0, 300.0))
+            .resizable(false)
+            .show(ui.ctx(), |ui| req = m.palette(ui, &self.session, t));
+        self.sketch_mode = Some(m);
+        self.handle_sketch_request(req);
+    }
+
+    fn handle_sketch_request(&mut self, req: Request) {
+        match req {
+            Request::None => {}
+            Request::Finish => self.finish_sketch(),
+            Request::Edit(ops) => {
+                let Some(id) = self.sketch_mode.as_ref().map(|m| m.sketch) else { return };
+                match self.session.execute("sketch.edit", &serde_json::json!({"sketch": id.0, "ops": ops})) {
+                    Ok(v) => {
+                        self.status = v.get("message").and_then(Value::as_str).unwrap_or("ok").to_string();
+                        if let Some(m) = self.sketch_mode.as_mut() {
+                            m.after_edit(&v);
+                            m.message = None;
+                        }
+                    }
+                    Err(e) => {
+                        self.status = e.to_string();
+                        if let Some(m) = self.sketch_mode.as_mut() {
+                            m.message = Some(e.to_string());
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fn wants_dialog(&self, id: &str) -> bool {
@@ -245,7 +428,16 @@ impl FormCraftApp {
                     let params = v.get("params").cloned().unwrap_or(Value::Null);
                     self.open_dialog(&cmd, &params, Some(id));
                 }
-                None => self.status = "Sketches are edited in sketch mode".into(),
+                None => {
+                    if matches!(
+                        self.session.document().feature(id).map(|f| &f.kind),
+                        Some(formcraft_engine::doc::FeatureKind::Sketch { .. })
+                    ) {
+                        self.enter_sketch(id);
+                    } else {
+                        self.status = "This feature cannot be edited".into();
+                    }
+                }
             },
             Err(e) => self.status = e.to_string(),
         }
@@ -257,7 +449,7 @@ impl FormCraftApp {
         let mut open = true;
         egui::Window::new(dlg.title.clone())
             .id(Id::new("feature_dialog"))
-            .anchor(Align2::RIGHT_TOP, Vec2::new(-170.0, 130.0))
+            .anchor(Align2::RIGHT_TOP, Vec2::new(-12.0, 300.0))
             .resizable(false)
             .collapsible(false)
             .open(&mut open)
@@ -776,7 +968,13 @@ impl FormCraftApp {
             self.layout.grid,
             self.layout.visual_style,
         );
-        self.handle_picking(ui, &resp, rect, size);
+        if let Some(mut m) = self.sketch_mode.take() {
+            let req = m.ui(ui, &resp, rect, &self.session, &self.camera, t);
+            self.sketch_mode = Some(m);
+            self.handle_sketch_request(req);
+        } else {
+            self.handle_picking(ui, &resp, rect, size);
+        }
 
         let origin = rect.min.to_vec2();
         let to_pos = |p: DVec2| Pos2::new(p.x as f32, p.y as f32) + origin;
@@ -1027,6 +1225,22 @@ impl FormCraftApp {
         if redo && self.session.can_redo() {
             self.run("doc.redo", Value::Null);
         }
+        if let Some(m) = self.sketch_mode.as_mut() {
+            let key = ui.input(|i| {
+                [
+                    (egui::Key::L, Tool::Line),
+                    (egui::Key::R, Tool::Rectangle),
+                    (egui::Key::C, Tool::Circle),
+                    (egui::Key::D, Tool::Dimension),
+                ]
+                .into_iter()
+                .find(|(k, _)| i.key_pressed(*k) && i.modifiers.is_none())
+                .map(|(_, t)| t)
+            });
+            if let Some(tool) = key {
+                m.set_tool(tool);
+            }
+        }
         let (home, f6) = ui.input(|i| (i.key_pressed(egui::Key::Home), i.key_pressed(egui::Key::F6)));
         if home {
             self.apply_named_view("HOME");
@@ -1075,6 +1289,10 @@ impl FormCraftApp {
             .show(ui, |ui| self.canvas(ui, &t));
         self.feature_dialog(ui, &t);
         self.rename_dialog(ui);
+        self.plane_picker_ui(ui);
+        if self.sketch_mode.is_some() {
+            self.sketch_palette(ui, &t);
+        }
         self.handle_screenshot(ui);
     }
 }

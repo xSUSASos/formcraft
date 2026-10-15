@@ -1166,6 +1166,7 @@ dependencies = [
  "formcraft-engine",
  "formcraft-kernel",
  "formcraft-render",
+ "formcraft-sketch",
  "formcraft-tess",
  "glam",
  "image",
