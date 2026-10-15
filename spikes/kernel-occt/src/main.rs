@@ -12,27 +12,33 @@ fn measure(s: &Shape) -> Option<(f64, [f64; 6])> {
 }
 
 fn main() {
-    let out = std::path::Path::new("out");
+    let out = std::path::Path::new("C:/fc-target/stepcheck/occt");
     std::fs::create_dir_all(out).unwrap();
     let mut results: Vec<(&str, Shape)> = vec![];
+    eprintln!("start");
 
     let b = Shape::box_from_corners(dvec3(0., 0., 0.), dvec3(60., 40., 10.));
     let cyl = Shape::cylinder(dvec3(30., 20., -1.), 5.0, DVec3::Z, 12.0);
+    eprintln!("op box_hole");
     results.push(("box_hole", b.subtract(&cyl).into()));
 
     let b = Shape::box_from_corners(dvec3(0., 0., 0.), dvec3(20., 20., 20.));
+    eprintln!("op fillet_all");
     results.push(("fillet_all", b.fillet(2.0)));
 
     let b = Shape::box_from_corners(dvec3(0., 0., 0.), dvec3(40., 40., 20.));
     let cyl = Shape::cylinder(dvec3(20., 20., -1.), 10.0, DVec3::Z, 22.0);
+    eprintln!("op cyl_cut");
     results.push(("cyl_cut", b.subtract(&cyl).into()));
 
-    let w = Wire::from_ordered_points([dvec3(10., 0., 0.), dvec3(20., 0., 0.), dvec3(20., 0., 30.), dvec3(10., 0., 30.), dvec3(10., 0., 0.)]).unwrap();
+    let w = Wire::from_ordered_points([dvec3(10., 0., 0.), dvec3(20., 0., 0.), dvec3(20., 0., 30.), dvec3(10., 0., 30.)]).unwrap();
     let rev: Shape = Face::from_wire(&w).revolve(DVec3::ZERO, DVec3::Z, None).into();
+    eprintln!("op revolve");
     results.push(("revolve", rev));
 
     let b = Shape::box_from_corners(dvec3(0., 0., 0.), dvec3(40., 30., 20.));
     let top = b.faces().farthest(Direction::PosZ);
+    eprintln!("op shell");
     results.push(("shell", b.hollow(-2.0, [top])));
 
     let mut pass = 0;
@@ -40,6 +46,7 @@ fn main() {
         if expect::report("occt", name, measure(s), "") {
             pass += 1;
         }
+        eprintln!("step {name}");
         let p = out.join(format!("{name}.step"));
         s.write_step(&p).unwrap();
         let back = Shape::read_step(&p).unwrap();
