@@ -1,0 +1,21 @@
+{
+  "prompt": "flange D120, 12 thick, six 9 mm holes on a 90 mm bolt circle, 30 mm bore in the centre",
+  "plan": {
+    "summary": "Flange D120x12, 6 x D9 on D90, bore D30",
+    "parameters": [
+      {"name": "flange_d", "expression": 120},
+      {"name": "flange_t", "expression": 12},
+      {"name": "bolt_circle_d", "expression": 90},
+      {"name": "bolt_hole_d", "expression": 9},
+      {"name": "bore_d", "expression": 30}
+    ],
+    "steps": [
+      {"command": "sketch.create", "params": {"plane": "XY", "circles": [{"center": [0, 0], "diameter": "flange_d"}]}},
+      {"command": "solid.extrude", "params": {"distance": "flange_t"}},
+      {"command": "solid.hole", "params": {"diameter": "bolt_hole_d", "points": [
+        [45, 0, "flange_t"], [22.5, 38.971, "flange_t"], [-22.5, 38.971, "flange_t"],
+        [-45, 0, "flange_t"], [-22.5, -38.971, "flange_t"], [22.5, -38.971, "flange_t"]]}},
+      {"command": "solid.hole", "params": {"diameter": "bore_d", "points": [[0, 0, "flange_t"]]}}
+    ]
+  }
+}

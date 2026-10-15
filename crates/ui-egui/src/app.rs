@@ -167,8 +167,13 @@ impl FormCraftApp {
             layout.text_commands.open = true;
         }
         let view = options.view.clone();
+        let mut session = Session::new();
+        let ai_status = match formcraft_ai::install(&mut session, &formcraft_ai::AiConfig::from_env()) {
+            Ok(_) => None,
+            Err(e) => Some(format!("Assistant unavailable: {e}")),
+        };
         let mut app = FormCraftApp {
-            session: Session::new(),
+            session,
             layout,
             camera,
             tab: "Solid".into(),
@@ -198,6 +203,9 @@ impl FormCraftApp {
             control_renderer: None,
             pending_shots: Vec::new(),
         };
+        if let Some(s) = ai_status {
+            app.status = s;
+        }
         if let Some(path) = app.options.script.clone() {
             app.run_script_file(&path);
             if view.is_none() {

@@ -1,0 +1,22 @@
+{
+  "prompt": "mounting plate 80 x 50, 6 mm thick, rounded corners R5, four M5 holes 8 mm from the edges",
+  "plan": {
+    "summary": "Plate 80x50x6, 4 x M5",
+    "parameters": [
+      {"name": "plate_length", "expression": 80},
+      {"name": "plate_width", "expression": 50},
+      {"name": "plate_t", "expression": 6, "comment": "thickness"},
+      {"name": "corner_r", "expression": 5},
+      {"name": "margin", "expression": 8, "comment": "hole centres from the edges"},
+      {"name": "hole_d", "expression": 5.5, "comment": "M5 clearance"}
+    ],
+    "steps": [
+      {"command": "sketch.create", "params": {"plane": "XY", "rectangles": [{"corner": [0, 0], "size": ["plate_length", "plate_width"]}]}},
+      {"command": "solid.extrude", "params": {"distance": "plate_t"}},
+      {"command": "solid.fillet", "params": {"edges": "vertical", "radius": "corner_r"}},
+      {"command": "solid.hole", "params": {"diameter": "hole_d", "points": [
+        ["margin", "margin", "plate_t"], ["plate_length - margin", "margin", "plate_t"],
+        ["plate_length - margin", "plate_width - margin", "plate_t"], ["margin", "plate_width - margin", "plate_t"]]}}
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "prompt": "bushing: outer diameter 30, inner 16, length 40, 1 mm chamfer on the outer edges",
+  "plan": {
+    "summary": "Bushing D30/D16 x 40",
+    "parameters": [
+      {"name": "outer_d", "expression": 30},
+      {"name": "inner_d", "expression": 16},
+      {"name": "length", "expression": 40},
+      {"name": "chamfer", "expression": 1}
+    ],
+    "steps": [
+      {"command": "sketch.create", "params": {"plane": "XY", "circles": [{"center": [0, 0], "diameter": "outer_d"}, {"center": [0, 0], "diameter": "inner_d"}]}},
+      {"command": "solid.extrude", "params": {"distance": "length"}},
+      {"command": "solid.chamfer", "params": {"edges": [{"near": [0, -15, 0]}, {"near": [0, -15, 40]}], "distance": "chamfer"}}
+    ]
+  }
+}

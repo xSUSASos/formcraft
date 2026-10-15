@@ -11,6 +11,7 @@ workspace = true
 
 [dependencies]
 formcraft-engine = { workspace = true }
+formcraft-ai = { workspace = true }
 formcraft-io = { workspace = true }
 formcraft-mcp = { workspace = true }
 formcraft-render = { workspace = true }

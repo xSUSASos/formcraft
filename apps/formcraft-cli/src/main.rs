@@ -27,6 +27,8 @@ usage:
   formcraft-cli convert <in.step|in.fcraft|script.fcs> <out.step|out.stl>
   formcraft-cli render <in.fcraft|script.fcs|in.step> <out.png> [--view iso|top|front|right|…] [--size WxH]
   formcraft-cli mcp [--port N]     MCP server on stdio (headless, or attached to `formcraft --control N`)
+  formcraft-cli ai \"<request>\" [--save <out.step|out.stl|out.fcraft>] [--plan-only]
+                                   build a part with the local LLM (FORMCRAFT_AI_MODEL, FORMCRAFT_AI_URL)
 
 A script is a JSON array of {\"command\": id, \"params\": {...}} or one command per line:
   solid.box {\"size\": [60, 40, 5]}
@@ -50,6 +52,7 @@ fn main() -> ExitCode {
         },
         Some("render") => render(&args[1..]),
         Some("mcp") => mcp(&args[1..]),
+        Some("ai") => ai(&args[1..]),
         Some("-h" | "--help" | "help") | None => {
             print!("{USAGE}");
             Ok(())
@@ -93,6 +96,9 @@ fn run(args: &[String]) -> Result<(), String> {
     }
     let steps = parse_script(&read_script(&script.ok_or("run needs a script (or - for stdin)")?)?)?;
     let mut session = Session::new();
+    if let Err(e) = formcraft_ai::install(&mut session, &formcraft_ai::AiConfig::from_env()) {
+        eprintln!("assistant unavailable: {e}");
+    }
     for (i, (cmd, params)) in steps.iter().enumerate() {
         match session.execute(cmd, params) {
             Ok(v) => {
@@ -109,6 +115,50 @@ fn run(args: &[String]) -> Result<(), String> {
     }
     let report = session.execute("model.inspect", &json!({})).map_err(|e| e.to_string())?;
     println!("{}", serde_json::to_string_pretty(&report).unwrap_or_default());
+    Ok(())
+}
+
+fn ai(args: &[String]) -> Result<(), String> {
+    let mut prompt = None;
+    let (mut save, mut plan_only) = (None::<String>, false);
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "--save" => save = Some(it.next().ok_or("--save needs a path")?.clone()),
+            "--plan-only" => plan_only = true,
+            p if prompt.is_none() => prompt = Some(p.to_string()),
+            other => return Err(format!("unexpected argument `{other}`")),
+        }
+    }
+    let prompt = prompt.ok_or("ai needs a request in quotes")?;
+    let mut s = Session::new();
+    let config = formcraft_ai::AiConfig::from_env();
+    let generator = formcraft_ai::install(&mut s, &config)?;
+    eprintln!("{} · {} …", config.backend, config.model);
+    let req = formcraft_ai::AiRequest { prompt, use_selection: false };
+    let cancel = std::sync::atomic::AtomicBool::new(false);
+    let p = generator.generate(&s, &req, &mut |pr| eprintln!("{}", pr.label()), &cancel).map_err(|e| e.to_string())?;
+    for (i, a) in p.attempts.iter().enumerate() {
+        eprintln!(
+            "attempt {}: {:.1} s{}",
+            i + 1,
+            a.seconds,
+            a.error.as_ref().map(|e| format!(" — {e}")).unwrap_or_default()
+        );
+    }
+    println!("{}", serde_json::to_string_pretty(&p.plan).unwrap_or_default());
+    if plan_only {
+        return Ok(());
+    }
+    let mut preview = p.preview;
+    let report = preview.execute("model.inspect", &json!({})).map_err(|e| e.to_string())?;
+    println!("{}", serde_json::to_string_pretty(&report).unwrap_or_default());
+    if let Some(path) = save {
+        let cmd = if path.ends_with(".fcraft") { "doc.save" } else { "doc.export" };
+        preview.execute(cmd, &json!({"path": path})).map_err(|e| e.to_string())?;
+        eprintln!("saved {path}");
+    }
+    eprintln!("done in {:.1} s", p.elapsed.as_secs_f64());
     Ok(())
 }
 

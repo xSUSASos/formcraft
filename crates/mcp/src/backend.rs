@@ -28,7 +28,11 @@ pub struct Headless {
 
 impl Headless {
     pub fn new() -> Self {
-        Headless { session: Session::new(), renderer: None }
+        let mut session = Session::new();
+        if let Err(e) = formcraft_ai::install(&mut session, &formcraft_ai::AiConfig::from_env()) {
+            log::warn!("assistant unavailable: {e}");
+        }
+        Headless { session, renderer: None }
     }
 }
 
