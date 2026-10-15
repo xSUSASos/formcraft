@@ -9,6 +9,7 @@
 )]
 
 mod builtin;
+mod features3;
 mod modeling;
 pub mod params;
 mod registry;
@@ -108,6 +109,7 @@ impl Session {
         };
         builtin::register(&mut s.registry);
         modeling::register(&mut s.registry);
+        features3::register(&mut s.registry);
         s
     }
 

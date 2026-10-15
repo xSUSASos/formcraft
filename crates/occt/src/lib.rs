@@ -206,6 +206,15 @@ impl Kernel for Occt {
         wrap("revolve", sys::revolve(f, &v3(o), &v3(d), angle))
     }
 
+    fn extrude_face(&self, shape: &Shape, face: u32, vector: DVec3) -> Result<Shape> {
+        let v = check_finite("press pull direction", vector)?;
+        if v.length() < 1e-9 {
+            return Err(KernelError::InvalidInput("press pull distance must not be zero".into()));
+        }
+        let _g = lock();
+        wrap("press pull", sys::face_prism(raw(shape)?, face, v.x, v.y, v.z))
+    }
+
     fn boolean(&self, op: BoolOp, a: &Shape, b: &Shape) -> Result<Shape> {
         let code = match op {
             BoolOp::Union => 0,

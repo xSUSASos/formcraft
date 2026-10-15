@@ -12,10 +12,13 @@
     clippy::unreachable
 )]
 
+mod features;
+pub mod select;
+
 use std::collections::HashMap;
 
 use formcraft_doc::{BodyId, BodyOp, CombineOp, Document, Expr, Feature, FeatureId, FeatureKind, Vec3Expr};
-use formcraft_kernel::{BoolOp, DVec3, Kernel, Shape};
+use formcraft_kernel::{BoolOp, DVec3, Kernel, Plane, Shape};
 use serde::Serialize;
 
 /// A body after regeneration.
@@ -43,12 +46,25 @@ pub struct FeatureStatus {
     pub status: Status,
 }
 
+/// A solved sketch (for drawing and for the features that use it).
+#[derive(Debug, Clone)]
+pub struct SketchResult {
+    pub id: FeatureId,
+    pub plane: Plane,
+    /// Geometry after solving constraints and dimensions.
+    pub sketch: formcraft_sketch::Sketch,
+    pub regions: Vec<formcraft_sketch::Region>,
+    /// Remaining degrees of freedom (0 = fully constrained).
+    pub dof: usize,
+}
+
 /// Result of regenerating a document.
 #[derive(Debug, Clone, Default)]
 pub struct Model {
     /// Bodies in creation order.
     pub bodies: Vec<Body>,
     pub status: Vec<FeatureStatus>,
+    pub sketches: Vec<SketchResult>,
 }
 
 impl Model {
@@ -61,37 +77,41 @@ impl Model {
     pub fn error_count(&self) -> usize {
         self.errors().count()
     }
+    pub fn sketch(&self, id: FeatureId) -> Option<&SketchResult> {
+        self.sketches.iter().find(|s| s.id == id)
+    }
 }
 
-struct Ctx<'a> {
-    kernel: &'a dyn Kernel,
+pub(crate) struct Ctx<'a> {
+    pub(crate) kernel: &'a dyn Kernel,
     params: HashMap<String, f64>,
-    bodies: Vec<(BodyId, Shape)>,
+    pub(crate) bodies: Vec<(BodyId, Shape)>,
+    pub(crate) sketches: Vec<SketchResult>,
 }
 
 impl Ctx<'_> {
-    fn num(&self, e: &Expr, what: &str) -> Result<f64, String> {
+    pub(crate) fn num(&self, e: &Expr, what: &str) -> Result<f64, String> {
         e.eval(&|n| self.params.get(n).copied()).map_err(|err| format!("{what}: {err}"))
     }
-    fn vec(&self, v: &Vec3Expr, what: &str) -> Result<DVec3, String> {
+    pub(crate) fn vec(&self, v: &Vec3Expr, what: &str) -> Result<DVec3, String> {
         let [x, y, z] = &v.0;
         Ok(DVec3::new(self.num(x, what)?, self.num(y, what)?, self.num(z, what)?))
     }
-    fn get(&self, b: BodyId) -> Result<&Shape, String> {
+    pub(crate) fn get(&self, b: BodyId) -> Result<&Shape, String> {
         self.bodies
             .iter()
             .find(|(id, _)| *id == b)
             .map(|(_, s)| s)
             .ok_or_else(|| format!("body #{} does not exist", b.0))
     }
-    fn set(&mut self, b: BodyId, s: Shape) {
+    pub(crate) fn set(&mut self, b: BodyId, s: Shape) {
         match self.bodies.iter_mut().find(|(id, _)| *id == b) {
             Some(slot) => slot.1 = s,
             None => self.bodies.push((b, s)),
         }
     }
     /// Put a new solid into the model according to the feature's operation.
-    fn apply(&mut self, f: &Feature, op: BodyOp, solid: Shape) -> Result<(), String> {
+    pub(crate) fn apply(&mut self, f: &Feature, op: BodyOp, solid: Shape) -> Result<(), String> {
         let bool_op = match op {
             BodyOp::NewBody => {
                 self.set(BodyId(f.id.0), solid);
@@ -154,6 +174,29 @@ fn run(ctx: &mut Ctx<'_>, f: &Feature) -> Result<(), String> {
             }
             Ok(())
         }
+        FeatureKind::Sketch { plane, sketch } => features::run_sketch(ctx, f, plane, sketch),
+        FeatureKind::Extrude { sketch, profiles, distance, direction, through_all, op } => {
+            features::run_extrude(ctx, f, *sketch, profiles, distance, *direction, *through_all, *op)
+        }
+        FeatureKind::Revolve { sketch, profiles, axis, angle, op } => {
+            features::run_revolve(ctx, f, *sketch, profiles, axis, angle, *op)
+        }
+        FeatureKind::Fillet { body, edges, radius } => features::run_fillet(ctx, *body, edges, radius, false),
+        FeatureKind::Chamfer { body, edges, distance } => features::run_fillet(ctx, *body, edges, distance, true),
+        FeatureKind::Shell { body, faces, thickness } => features::run_shell(ctx, *body, faces, thickness),
+        FeatureKind::Hole { body, face, points, diameter, depth, counterbore, countersink } => features::run_hole(
+            ctx,
+            features::HoleSpec {
+                body: *body,
+                face,
+                points,
+                diameter,
+                depth: depth.as_ref(),
+                counterbore: counterbore.as_ref(),
+                countersink: countersink.as_ref(),
+            },
+        ),
+        FeatureKind::PressPull { body, face, distance } => features::run_press_pull(ctx, *body, face, distance),
     }
 }
 
@@ -168,7 +211,7 @@ pub fn regen(doc: &Document, kernel: &dyn Kernel) -> Model {
             HashMap::new()
         }
     };
-    let mut ctx = Ctx { kernel, params, bodies: Vec::new() };
+    let mut ctx = Ctx { kernel, params, bodies: Vec::new(), sketches: Vec::new() };
     let active = doc.active_features().len();
     for (i, f) in doc.features.iter().enumerate() {
         let status = if i >= active {
@@ -183,6 +226,7 @@ pub fn regen(doc: &Document, kernel: &dyn Kernel) -> Model {
         };
         model.status.push(FeatureStatus { id: f.id, name: f.name.clone(), status });
     }
+    model.sketches = std::mem::take(&mut ctx.sketches);
     for (id, shape) in ctx.bodies {
         let state = doc.bodies.get(&id);
         model.bodies.push(Body {
@@ -197,3 +241,6 @@ pub fn regen(doc: &Document, kernel: &dyn Kernel) -> Model {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod tests3;

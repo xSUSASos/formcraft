@@ -31,6 +31,8 @@ std::unique_ptr<Shape> make_torus(rust::Slice<const double> center, rust::Slice<
 std::unique_ptr<Shape> make_faces(rust::Slice<const double> segs, rust::Slice<const uint32_t> loop_sizes,
                                   rust::Slice<const uint32_t> region_sizes, rust::Slice<const double> normal);
 std::unique_ptr<Shape> prism(const Shape &s, double dx, double dy, double dz);
+// Prism of face `face` of `s` along (dx, dy, dz).
+std::unique_ptr<Shape> face_prism(const Shape &s, uint32_t face, double dx, double dy, double dz);
 std::unique_ptr<Shape> revolve(const Shape &s, rust::Slice<const double> origin, rust::Slice<const double> dir,
                                double angle);
 

@@ -19,3 +19,4 @@ log = { workspace = true }
 
 [dev-dependencies]
 formcraft-occt = { workspace = true }
+formcraft-sketch = { workspace = true }

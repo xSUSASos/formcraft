@@ -194,6 +194,9 @@ pub trait Kernel: Send + Sync {
     /// Revolve a profile around an axis by `angle` radians (2π = full).
     fn revolve(&self, profile: &Profile, axis_origin: DVec3, axis_dir: DVec3, angle: f64) -> Result<Shape>;
 
+    /// Prism of one face of a shape along `vector` (press pull).
+    fn extrude_face(&self, shape: &Shape, face: u32, vector: DVec3) -> Result<Shape>;
+
     // --- modifications ---
     fn boolean(&self, op: BoolOp, a: &Shape, b: &Shape) -> Result<Shape>;
     fn fillet(&self, shape: &Shape, edges: &[u32], radius: f64) -> Result<Shape>;

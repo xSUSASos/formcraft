@@ -494,8 +494,10 @@ pub fn solve(sketch: &mut Sketch, dims_deg: &[f64]) -> SolveReport {
     if !report.converged {
         x = start;
     }
-    // Write back.
-    let values: Vec<(Var, f64)> = sys.vars.iter().copied().zip(x.iter().copied()).collect();
+    // Write back, snapped to a 1e-9 mm grid: removes solver noise (a 1e-12 skew on a
+    // "horizontal" line upsets downstream B-rep operations such as fillets).
+    let snap = |v: f64| if v.abs() < 1e9 { (v * 1e9).round() / 1e9 } else { v };
+    let values: Vec<(Var, f64)> = sys.vars.iter().copied().zip(x.iter().copied().map(snap)).collect();
     for (v, val) in values {
         match v {
             Var::X(id) => {

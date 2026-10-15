@@ -212,3 +212,93 @@ fn hostile_params_never_panic() {
         }
     }
 }
+
+// ---------------------------------------------------------------- Phase 3 commands
+
+fn vol0(s: &mut Session) -> f64 {
+    inspect_body(s, 0)["volume"].as_f64().unwrap()
+}
+
+#[test]
+fn parametric_bracket_by_commands() {
+    use std::f64::consts::PI;
+    let mut s = session();
+    for (n, v) in [("L", "60"), ("W", "40"), ("T", "5"), ("hole_d", "6.6"), ("edge", "8")] {
+        s.execute("doc.parameter", &json!({"name": n, "expression": v})).unwrap();
+    }
+    let sk = s
+        .execute(
+            "sketch.create",
+            &json!({"plane": "XY", "rectangles": [{"corner": [0, 0], "size": ["L", "W"]}],
+                    "circles": [{"center": ["edge", "edge"], "diameter": "hole_d"}, {"center": ["L - edge", "W - edge"], "diameter": "hole_d"}]}),
+        )
+        .unwrap();
+    assert_eq!(sk["profiles"], 3, "{sk}");
+    s.execute("solid.extrude", &json!({"distance": "T"})).unwrap();
+    s.execute("solid.fillet", &json!({"edges": "vertical", "radius": 3})).unwrap();
+    let expect = |l: f64, w: f64, t: f64, d: f64| (l * w - (4.0 - PI) * 9.0 - 2.0 * PI * d * d / 4.0) * t;
+    assert!((vol0(&mut s) - expect(60.0, 40.0, 5.0, 6.6)).abs() < 1e-3, "{}", vol0(&mut s));
+    s.execute("doc.parameter", &json!({"name": "L", "expression": "90"})).unwrap();
+    s.execute("doc.parameter", &json!({"name": "hole_d", "expression": "9"})).unwrap();
+    assert_eq!(s.model().error_count(), 0, "{:?}", s.model().status);
+    assert!((vol0(&mut s) - expect(90.0, 40.0, 5.0, 9.0)).abs() < 1e-3);
+    let b = inspect_body(&mut s, 0);
+    assert_eq!(b["bbox"]["size"], json!([90.0, 40.0, 5.0]));
+}
+
+#[test]
+fn flange_with_bolt_circle() {
+    use std::f64::consts::PI;
+    let mut s = session();
+    s.execute("sketch.create", &json!({"circles": [{"center": [0, 0], "diameter": 100}]})).unwrap();
+    s.execute("solid.extrude", &json!({"distance": 10})).unwrap();
+    let pts: Vec<Value> = (0..4)
+        .map(|i| {
+            let a = PI / 4.0 + i as f64 * PI / 2.0;
+            json!([40.0 * a.cos(), 40.0 * a.sin(), 10])
+        })
+        .collect();
+    s.execute("solid.hole", &json!({"points": pts, "diameter": 9})).unwrap();
+    let b = inspect_body(&mut s, 0);
+    let want = PI * 2500.0 * 10.0 - 4.0 * PI * 20.25 * 10.0;
+    assert!((b["volume"].as_f64().unwrap() - want).abs() < 1e-3, "{b}");
+    assert_eq!(b["cylindrical_faces"], 5);
+}
+
+#[test]
+fn hole_counterbore_shell_press_pull_by_commands() {
+    let mut s = session();
+    s.execute("solid.box", &json!({"size": [50, 30, 20]})).unwrap();
+    s.execute("solid.shell", &json!({"thickness": 2})).unwrap();
+    s.execute("solid.press_pull", &json!({"face": "bottom", "distance": 3})).unwrap();
+    s.execute(
+        "solid.hole",
+        &json!({"face": "bottom", "points": [[25, 15, 0]], "diameter": 4, "counterbore": {"diameter": 8, "depth": 2}}),
+    )
+    .unwrap();
+    s.execute("solid.chamfer", &json!({"edges": "top_outer", "distance": 0.5})).unwrap();
+    assert_eq!(s.model().error_count(), 0, "{:?}", s.model().status);
+    let b = inspect_body(&mut s, 0);
+    assert!((b["bbox"]["min"][2].as_f64().unwrap() + 3.0).abs() < 1e-6, "{b}");
+    assert_eq!(b["valid"], true);
+}
+
+#[test]
+fn revolve_and_errors_by_commands() {
+    let mut s = session();
+    s.execute(
+        "sketch.create",
+        &json!({"plane": "XZ", "polylines": [{"points": [[5, 0], [15, 0], [15, 20], [5, 20]]}]}),
+    )
+    .unwrap();
+    s.execute("solid.revolve", &json!({"axis": "Z"})).unwrap();
+    let v = vol0(&mut s);
+    assert!((v - std::f64::consts::PI * 200.0 * 20.0).abs() < 1e-3, "{v}");
+    assert!(s.execute("solid.extrude", &json!({"sketch": "Revolve1", "distance": 5})).is_err());
+    assert!(s.execute("solid.fillet", &json!({"edges": "diagonal", "radius": 1})).is_err());
+    assert!(s.execute("solid.fillet", &json!({"radius": 100})).is_err());
+    assert!(s.execute("sketch.create", &json!({"rectangles": [{"size": [0, 5]}]})).is_err());
+    assert!(s.execute("sketch.create", &json!({"plane": "QQ"})).is_err());
+    assert!(s.execute("solid.hole", &json!({"points": [], "diameter": 3})).is_err());
+    assert_eq!(s.model().error_count(), 0, "refused edits leave no red features");
+}

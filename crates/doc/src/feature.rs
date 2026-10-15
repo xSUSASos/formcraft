@@ -2,6 +2,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use formcraft_sketch::{Eid, Sketch};
+
+use crate::select::{EdgeSel, FaceSel};
 use crate::{BodyId, Expr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -63,6 +66,72 @@ pub enum FeatureKind {
         #[serde(default)]
         op: BodyOp,
     },
+    Sketch {
+        plane: SketchPlane,
+        sketch: Sketch,
+    },
+    Extrude {
+        sketch: FeatureId,
+        #[serde(default, skip_serializing_if = "ProfileSel::is_all")]
+        profiles: ProfileSel,
+        distance: Expr,
+        #[serde(default)]
+        direction: ExtrudeDirection,
+        /// Cut through everything (ignores `distance`).
+        #[serde(default)]
+        through_all: bool,
+        #[serde(default)]
+        op: BodyOp,
+    },
+    Revolve {
+        sketch: FeatureId,
+        #[serde(default, skip_serializing_if = "ProfileSel::is_all")]
+        profiles: ProfileSel,
+        axis: RevolveAxis,
+        #[serde(default = "full_turn")]
+        angle: Expr,
+        #[serde(default)]
+        op: BodyOp,
+    },
+    Fillet {
+        body: BodyId,
+        edges: EdgeSel,
+        radius: Expr,
+    },
+    Chamfer {
+        body: BodyId,
+        edges: EdgeSel,
+        distance: Expr,
+    },
+    /// Hollow a body: remove `faces` (open sides) and keep walls of `thickness`.
+    Shell {
+        body: BodyId,
+        #[serde(default = "no_faces")]
+        faces: FaceSel,
+        thickness: Expr,
+    },
+    /// Holes drilled into `face` at `points` (3D, projected onto the face plane).
+    Hole {
+        body: BodyId,
+        face: FaceSel,
+        points: Vec<Vec3Expr>,
+        diameter: Expr,
+        /// None = through all.
+        #[serde(default)]
+        depth: Option<Expr>,
+        /// Counterbore (diameter, depth).
+        #[serde(default)]
+        counterbore: Option<(Expr, Expr)>,
+        /// Countersink (diameter, included angle in degrees).
+        #[serde(default)]
+        countersink: Option<(Expr, Expr)>,
+    },
+    /// Push or pull a planar face along its normal (adds or removes material).
+    PressPull {
+        body: BodyId,
+        face: FaceSel,
+        distance: Expr,
+    },
     /// Boolean between two existing bodies; the tool body is consumed unless `keep_tool`.
     Combine {
         target: BodyId,
@@ -71,6 +140,72 @@ pub enum FeatureKind {
         #[serde(default)]
         keep_tool: bool,
     },
+}
+
+/// Where a sketch lives.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum SketchPlane {
+    /// An origin plane ("XY", "XZ", "YZ") moved along its normal by `offset`.
+    Origin {
+        name: String,
+        #[serde(default = "zero")]
+        offset: Expr,
+    },
+    /// A planar face of a body (resolved at every regeneration).
+    Face {
+        body: BodyId,
+        face: FaceSel,
+        #[serde(default = "zero")]
+        offset: Expr,
+    },
+}
+
+fn zero() -> Expr {
+    Expr::num(0.0)
+}
+
+fn full_turn() -> Expr {
+    Expr::num(360.0)
+}
+
+/// Which closed regions of a sketch a feature uses.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(untagged)]
+pub enum ProfileSel {
+    /// Outer regions with their holes (even nesting depth).
+    #[default]
+    All,
+    /// Regions containing these sketch-plane points (stable across edits).
+    Points { points: Vec<[f64; 2]> },
+    /// Regions by index in the current region list.
+    Indices { indices: Vec<usize> },
+}
+
+impl ProfileSel {
+    pub fn is_all(&self) -> bool {
+        matches!(self, ProfileSel::All)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ExtrudeDirection {
+    /// Along the sketch normal (negative distance goes the other way).
+    #[default]
+    OneSide,
+    /// Half the distance to each side.
+    Symmetric,
+}
+
+/// Axis of a revolve.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RevolveAxis {
+    /// "X", "Y", "Z" (world axes through the origin) or "sketch_x", "sketch_y".
+    Name(String),
+    /// A line of the sketch.
+    Line { line: Eid },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -89,15 +224,25 @@ impl FeatureKind {
             FeatureKind::Cylinder { .. } => "Cylinder",
             FeatureKind::Sphere { .. } => "Sphere",
             FeatureKind::Combine { .. } => "Combine",
+            FeatureKind::Sketch { .. } => "Sketch",
+            FeatureKind::Extrude { .. } => "Extrude",
+            FeatureKind::Revolve { .. } => "Revolve",
+            FeatureKind::Fillet { .. } => "Fillet",
+            FeatureKind::Chamfer { .. } => "Chamfer",
+            FeatureKind::Shell { .. } => "Shell",
+            FeatureKind::Hole { .. } => "Hole",
+            FeatureKind::PressPull { .. } => "PressPull",
         }
     }
 
     pub fn op(&self) -> Option<BodyOp> {
         match self {
-            FeatureKind::Box { op, .. } | FeatureKind::Cylinder { op, .. } | FeatureKind::Sphere { op, .. } => {
-                Some(*op)
-            }
-            FeatureKind::Combine { .. } => None,
+            FeatureKind::Box { op, .. }
+            | FeatureKind::Cylinder { op, .. }
+            | FeatureKind::Sphere { op, .. }
+            | FeatureKind::Extrude { op, .. }
+            | FeatureKind::Revolve { op, .. } => Some(*op),
+            _ => None,
         }
     }
 
@@ -110,6 +255,12 @@ impl FeatureKind {
     pub fn body_refs(&self) -> Vec<BodyId> {
         match self {
             FeatureKind::Combine { target, tool, .. } => vec![*target, *tool],
+            FeatureKind::Fillet { body, .. }
+            | FeatureKind::Chamfer { body, .. }
+            | FeatureKind::Shell { body, .. }
+            | FeatureKind::Hole { body, .. }
+            | FeatureKind::PressPull { body, .. } => vec![*body],
+            FeatureKind::Sketch { plane: SketchPlane::Face { body, .. }, .. } => vec![*body],
             k => k.op().and_then(|o| o.target()).into_iter().collect(),
         }
     }
@@ -126,4 +277,8 @@ pub struct Feature {
     pub group: Option<u32>,
     #[serde(flatten)]
     pub kind: FeatureKind,
+}
+
+fn no_faces() -> FaceSel {
+    FaceSel::Many(Vec::new())
 }

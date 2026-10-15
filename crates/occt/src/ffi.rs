@@ -34,6 +34,7 @@ pub(crate) mod bridge {
             normal: &[f64],
         ) -> Result<UniquePtr<Shape>>;
         fn prism(s: &Shape, dx: f64, dy: f64, dz: f64) -> Result<UniquePtr<Shape>>;
+        fn face_prism(s: &Shape, face: u32, dx: f64, dy: f64, dz: f64) -> Result<UniquePtr<Shape>>;
         fn revolve(s: &Shape, origin: &[f64], dir: &[f64], angle: f64) -> Result<UniquePtr<Shape>>;
 
         fn boolean_op(a: &Shape, b: &Shape, op: u32) -> Result<UniquePtr<Shape>>;

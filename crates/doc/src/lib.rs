@@ -14,13 +14,18 @@
 
 pub mod expr;
 mod feature;
+pub mod select;
 
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
 pub use expr::{Expr, ExprError};
-pub use feature::{BodyOp, CombineOp, Feature, FeatureId, FeatureKind, Vec3Expr};
+pub use feature::{
+    BodyOp, CombineOp, ExtrudeDirection, Feature, FeatureId, FeatureKind, ProfileSel, RevolveAxis, SketchPlane,
+    Vec3Expr,
+};
+pub use select::{EdgeSel, FaceSel};
 
 /// A body is identified by the feature that created it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]

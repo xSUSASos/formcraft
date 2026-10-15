@@ -282,6 +282,19 @@ std::unique_ptr<Shape> prism(const Shape &s, double dx, double dy, double dz) {
   })
 }
 
+std::unique_ptr<Shape> face_prism(const Shape &s, uint32_t face, double dx, double dy, double dz) {
+  FC_GUARD("press pull", {
+    gp_Vec v(dx, dy, dz);
+    if (v.Magnitude() < 1e-9) throw std::runtime_error("zero distance");
+    TopTools_IndexedMapOfShape map;
+    TopoDS_Shape f = indexed(s, TopAbs_FACE, face, map);
+    BRepPrimAPI_MakePrism mk(f, v, Standard_True);
+    mk.Build();
+    if (!mk.IsDone()) throw std::runtime_error("not done");
+    return boxed(mk.Shape());
+  })
+}
+
 std::unique_ptr<Shape> revolve(const Shape &s, rust::Slice<const double> origin, rust::Slice<const double> d,
                                double angle) {
   FC_GUARD("revolve", {
