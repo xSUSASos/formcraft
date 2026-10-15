@@ -23,7 +23,7 @@ use std::sync::Arc;
 
 pub use glam::{DMat4, DVec2, DVec3};
 pub use mesh::{EdgePolyline, Mesh};
-pub use profile::{Loop2, Plane, Profile, Segment2};
+pub use profile::{Loop2, Plane, Profile, Region, Segment2};
 use serde::{Deserialize, Serialize};
 
 pub type Result<T> = std::result::Result<T, KernelError>;
