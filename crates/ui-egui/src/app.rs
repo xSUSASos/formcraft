@@ -82,6 +82,8 @@ pub struct FormCraftApp {
     /// Where the ViewCube was drawn last frame (tests, hit checks).
     cube_area: Rect,
     viewport: Viewport,
+    /// Canvas rectangle of the last frame (tests).
+    canvas_rect: Rect,
 }
 
 impl FormCraftApp {
@@ -131,6 +133,7 @@ impl FormCraftApp {
             screenshot_requested: false,
             cube_area: Rect::NOTHING,
             viewport: Viewport::new(None),
+            canvas_rect: Rect::NOTHING,
         };
         if let Some(path) = app.options.script.clone() {
             app.run_script_file(&path);
@@ -217,16 +220,16 @@ impl FormCraftApp {
                         ] {
                             let on = self.session.registry().get(id).is_some();
                             if ui.add_enabled(on, egui::Button::new(label)).clicked() {
-                                self.run(id, Value::Null);
                                 ui.close();
+                                self.file_action(id);
                             }
                         }
                     });
-                    let undo_on = self.session.registry().get("doc.undo").is_some();
+                    let undo_on = self.session.can_undo();
                     if icons::button(ui, t, "undo", "Undo (Ctrl+Z)", 20.0, undo_on, false).clicked() {
                         self.run("doc.undo", Value::Null);
                     }
-                    let redo_on = self.session.registry().get("doc.redo").is_some();
+                    let redo_on = self.session.can_redo();
                     if icons::button(ui, t, "redo", "Redo (Ctrl+Y)", 20.0, redo_on, false).clicked() {
                         self.run("doc.redo", Value::Null);
                     }
@@ -248,6 +251,28 @@ impl FormCraftApp {
                     );
                 });
             });
+    }
+
+    /// File menu actions that need a file dialog first (programmatic calls never open one).
+    fn file_action(&mut self, id: &str) {
+        match id {
+            "doc.export" => {
+                let picked = rfd::FileDialog::new()
+                    .set_title("Export")
+                    .add_filter("STEP", &["step", "stp"])
+                    .add_filter("STL", &["stl"])
+                    .set_file_name(format!("{}.step", self.session.document().name))
+                    .save_file();
+                if let Some(path) = picked {
+                    self.run(id, serde_json::json!({"path": path.to_string_lossy()}));
+                }
+            }
+            "doc.new" => {
+                self.run(id, Value::Null);
+                self.doc_name = self.session.document().name.clone();
+            }
+            other => self.run(other, Value::Null),
+        }
     }
 
     fn view_menu(&mut self, ui: &mut Ui) {
@@ -565,6 +590,7 @@ impl FormCraftApp {
 
     fn canvas(&mut self, ui: &mut Ui, t: &Tokens) {
         let rect = ui.max_rect();
+        self.canvas_rect = rect;
         let resp = ui.interact(rect, Id::new("canvas"), Sense::click_and_drag());
         let size = DVec2::new(rect.width() as f64, rect.height() as f64);
         let painter = ui.painter_at(rect);
@@ -822,6 +848,19 @@ impl FormCraftApp {
     fn shortcuts(&mut self, ui: &Ui) {
         if ui.ctx().egui_wants_keyboard_input() {
             return;
+        }
+        let (undo, redo) = ui.input_mut(|i| {
+            (
+                i.consume_key(egui::Modifiers::COMMAND, egui::Key::Z),
+                i.consume_key(egui::Modifiers::COMMAND, egui::Key::Y)
+                    || i.consume_key(egui::Modifiers::COMMAND | egui::Modifiers::SHIFT, egui::Key::Z),
+            )
+        });
+        if undo && self.session.can_undo() {
+            self.run("doc.undo", Value::Null);
+        }
+        if redo && self.session.can_redo() {
+            self.run("doc.redo", Value::Null);
         }
         let (home, f6) = ui.input(|i| (i.key_pressed(egui::Key::Home), i.key_pressed(egui::Key::F6)));
         if home {

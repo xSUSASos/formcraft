@@ -81,7 +81,7 @@ impl Viewport {
         let Some((_, r)) = self.gpu.as_mut() else { return };
         let base = linear(BODY);
         let edge = rgba(Color32::from_rgb(0x20, 0x24, 0x2a));
-        let selected = rgba(t.selection);
+        let selected = rgba(t.accent);
         let hover = rgba(t.hover);
         for (key, m) in &self.meshes {
             let body = BodyId(*key as u32);

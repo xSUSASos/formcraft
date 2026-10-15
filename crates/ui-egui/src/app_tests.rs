@@ -144,3 +144,30 @@ fn both_themes_render() {
     h.state_mut().layout.theme = ThemeKind::Dark;
     h.run_steps(3);
 }
+
+#[test]
+fn clicking_the_canvas_picks_faces() {
+    let mut h = harness();
+    h.state_mut()
+        .session()
+        .execute("solid.box", &serde_json::json!({"corner": [-30, -20, 0], "size": [60, 40, 5]}))
+        .unwrap();
+    h.state_mut().apply_named_view("TOP");
+    h.state_mut().fit();
+    h.run_steps(3);
+    let c = h.state().canvas_rect.center();
+    click(&mut h, c);
+    let sel = h.state_mut().session().selection().items.clone();
+    assert!(matches!(sel.as_slice(), [Pick::Face { .. }]), "{sel:?}");
+    // Ctrl-click the same face removes it again.
+    h.event(Event::ModifiersChanged(Modifiers::CTRL));
+    click(&mut h, c);
+    h.event(Event::ModifiersChanged(Modifiers::NONE));
+    h.step();
+    assert!(h.state_mut().session().selection().items.is_empty());
+    // Click on empty space clears.
+    click(&mut h, c);
+    let empty = h.state().canvas_rect.left_top() + Vec2::new(20.0, 200.0);
+    click(&mut h, empty);
+    assert!(h.state_mut().session().selection().items.is_empty());
+}
