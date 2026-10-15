@@ -4,18 +4,15 @@
 > Сессии иногда обрываются: PROGRESS.md обновлять после каждого шага, сборки > 10 мин — фоном.
 
 ## Сейчас
-- **Фаза:** 3 — Эскиз, фичи, таймлайн (начинается)
-- **Фазы 1 и 2 закрыты**, теги phase-1, phase-2.
-- **Фаза 3: сделано** шаги 1–2 (крейт `sketch`: модель, решатель, профили; фичи Sketch/Extrude/Revolve/Fillet/Chamfer/Shell/Hole/PressPull с семантическими селекторами; команды `sketch.create`, `solid.*`). Дальше: шаг 7 (.fcraft), затем UI — таймлайн, feature dialog, режим эскиза, marking menu, S-box.
-- **План фазы 3 (шаги):**
-  1. `sketch`: модель эскиза (точки, линии, окружности, дуги на плоскости/грани), ограничения и размеры, решатель (Ньютон–Гаусс/Левенберг–Марквардт, своя реализация), поиск замкнутых областей (профилей).
-  2. `doc`/`regen`: фичи Sketch, Extrude (новое тело/join/cut, расстояние, симметрия), Revolve, Fillet, Chamfer, Shell, Hole (простое/зенковка/цековка), Press Pull. Семантические селекторы граней/рёбер (`top`, `+X`, `vertical_edges`, `circular_edges`, `largest_planar_face`, сигнатуры) — топологическое именование.
-  3. Таймлайн в UI: иконки фич, перетаскивание, маркер отката, двойной клик = редактирование, подсветка ошибок. Таблица параметров (Change Parameters).
-  4. Feature dialog (справа, плавающий): поля с выражениями, OK/Cancel, живое превью (полупрозрачное); генерация диалога из JSON-схемы команды (пригодится плагинам). Манипуляторы (стрелка extrude, кольцо revolve).
-  5. Режим эскиза в UI: Create Sketch → выбор плоскости/грани → вид на эскиз; line/rect/circle/arc мышью, D (размер), ограничения, sketch palette, Finish Sketch.
-  6. Marking menu (правый клик), shortcut box (S) без ИИ, горячие клавиши E/L/R/C/D/F/H/Q/M + `docs/shortcuts.md`.
-  7. `.fcraft` (zip: document.json + превью PNG): сохранить/открыть.
-  8. Golden-тесты на 10 эталонных деталей (делегировать фикстуры Sonnet), приёмка: кронштейн мышью + изменение параметра.
+- **Фаза:** 4 — Команды, CLI, MCP (начинается). Фаза 3 закрыта (приёмка ниже), ждёт learn-док от Sonnet → тег phase-3.
+- **План фазы 4:**
+  1. `render::headless`: PNG тел (headless wgpu) — для `formcraft-cli render` и MCP `render`.
+  2. CLI: `convert` (STEP→STL/STEP), `render`, `mcp`.
+  3. Крейт `mcp`: JSON-RPC 2.0 по stdio, инструменты `execute`, `list_commands`, `inspect_model`, `render`, `list_selectors`, `screenshot`, `ui_click`; бэкенды Headless (сессия в процессе) и Remote (TCP control channel запущенного приложения).
+  4. Control channel в приложении: `formcraft --control PORT` (127.0.0.1, JSON-строки: engine.execute, model.inspect, ui.screenshot, ui.click, ui.render).
+  5. `.mcp.json` в репо (formcraft-cli mcp) + проверка: построить кронштейн через MCP, проверить inspect_model и render.
+  6. ADR 0003 «Plugin API v1» (WIT), без реализации.
+  7. docs/learn/phase-4.md, тег phase-4.
 
 ## Как собирать и проверять
 - `cargo xtask ci` — fmt, clippy -D warnings, тесты, слои, cargo deny. Обычный `target/` (первая сборка OCCT 30–60 мин).
@@ -31,7 +28,7 @@
 | 0 Окружение и ядро | готово | phase-0 |
 | 1 Каркас и оболочка UI | готово | phase-1 |
 | 2 Тело на экране | готово | phase-2 |
-| 3 Эскиз, фичи, таймлайн | в работе | — |
+| 3 Эскиз, фичи, таймлайн | готово (ждёт learn-док) | — |
 | 4 Команды, CLI, MCP | — | — |
 | 5 Встроенный ИИ | — | — |
 | 6 Плагины и скрипты | — | — |
@@ -52,10 +49,18 @@
 - Рендер с рёбрами, выбор и подсветка: `docs/images/phase2-bracket-selection.png` (выделена грань), тест `clicking_the_canvas_picks_faces`, `crates/render/src/gpu_tests.rs` (офскрин-рендер на локальном GPU).
 - Тела в Browser (глаз = `body.visibility`), примитивы и булевы — команды `solid.box/cylinder/sphere/combine`, экспорт STEP/STL — `doc.export` и File → Export.
 
+## Приёмка Фазы 3
+- «Собрать кронштейн мышью, изменить параметр → корректное перестроение»: `cargo test -p formcraft-ui-egui acceptance_bracket_with_the_mouse` — ok (S/R/D/E/F, клики по canvas, размер `L` в поле на холсте, диалоги Extrude/Fillet, `L` 60→80 → объём (L·30 − (4−π)·9)·5 точно).
+- Golden-тесты на 10 эталонных деталей: `cargo test -p formcraft-engine --test golden` — 10 passed (plate, bushing, flange, l_bracket, washer, hex_nut, shaft_keyway, enclosure, pulley, rounded_plate; объёмы аналитически).
+- Фичи: `crates/regen/src/tests3.rs` 12 golden-тестов (эскиз+выдавливание, симметрия, through all, revolve, fillet при смене параметров, chamfer, shell, цековка, зенковка, press pull, эскиз на грани, сигнатура грани).
+- UI: скриншоты `docs/images/phase3-*.png` (режим эскиза, диалог+таймлайн, marking menu, манипулятор). Сравнение с п. 2: feature dialog справа ✓, манипуляторы ✓, marking menu ✓, S-box ✓, sketch palette ✓, таймлайн с иконками/маркером/ошибками ✓.
+- `.fcraft`: тест `save_and_open_round_trip`.
+
 ## Журнал
 - 2026-10-14: репозиторий, PLAN, PROGRESS; Rust; изучен `../cadcraft-ref`.
 - 2026-10-15: spike ядер → ADR 0001; своя обвязка OCCT; реестр команд; UI-оболочка; ADR 0002. Тег phase-0.
 - 2026-10-15: doc/regen/engine (undo, атомарные правки, команды), io (STL, STEP), CLI, GPU-вьюпорт с выбором. 20 иконок от Sonnet. Теги phase-1, phase-2.
+- 2026-10-15/16: фаза 3: UI (диалог из JSON-схемы с живым превью, таймлайн, режим эскиза, marking menu, S-box, манипуляторы), .fcraft, приёмка, golden.
 - 2026-10-15: sketch (решатель, профили), фичи фазы 3 с селекторами. Найдено: шум решателя 1e-12 ломал скругления OCCT → снап координат к 1e-9. Числовые углы/центры в `sketch.create` закрепляются, иначе прямоугольник растёт в обе стороны при смене параметра.
 
 ## Требует человека
@@ -73,3 +78,5 @@
 - `docs/learn/phase-0.md` — проверено, одна строка исправлена.
 - 20 иконок тулбара в `crates/ui-egui/src/icons.rs` — проверено: clippy/CI зелёные, на скриншоте выглядят корректно.
 - `docs/learn/phase-1.md`, `docs/learn/phase-2.md` — проверены (структура, ключевые факты), без правок.
+- 10 golden-деталей (`examples/golden`, `crates/engine/tests/golden.rs`) — проверено: все зелёные, выборочно пересчитан фланец.
+- `docs/shortcuts.md`, `docs/learn/phase-3.md` — в работе.
