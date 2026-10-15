@@ -18,7 +18,7 @@ pub fn arrow(ui: &mut Ui, rect: Rect, cam: &Camera, t: &Tokens, origin: DVec3, d
     let p0 = screen(cam, rect, origin)?;
     let unit = screen(cam, rect, origin + dir)? - p0; // pixels per mm along the arrow
     let len_px = unit.length();
-    if !(len_px > 1e-4) {
+    if len_px.is_nan() || len_px <= 1e-4 {
         return None;
     }
     // The handle sits at the value, but never closer than 30 px to the base.

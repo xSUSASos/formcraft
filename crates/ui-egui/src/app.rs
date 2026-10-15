@@ -1179,10 +1179,10 @@ impl FormCraftApp {
                     return;
                 };
                 let origin = sk.plane.to_world(region.sample);
-                if let Some(nv) = manipulator::arrow(ui, rect, &self.camera, t, origin, sk.plane.normal, v) {
-                    if let Some(dl) = self.dialog.as_mut() {
-                        dl.set_text("distance", formcraft_engine::doc::expr::fmt_num(nv));
-                    }
+                if let Some(nv) = manipulator::arrow(ui, rect, &self.camera, t, origin, sk.plane.normal, v)
+                    && let Some(dl) = self.dialog.as_mut()
+                {
+                    dl.set_text("distance", formcraft_engine::doc::expr::fmt_num(nv));
                 }
             }
             "solid.press_pull" => {
@@ -1203,10 +1203,10 @@ impl FormCraftApp {
                 ) else {
                     return;
                 };
-                if let Some(nv) = manipulator::arrow(ui, rect, &self.camera, t, f.center, f.normal.normalize(), v) {
-                    if let Some(dl) = self.dialog.as_mut() {
-                        dl.set_text("distance", formcraft_engine::doc::expr::fmt_num(nv));
-                    }
+                if let Some(nv) = manipulator::arrow(ui, rect, &self.camera, t, f.center, f.normal.normalize(), v)
+                    && let Some(dl) = self.dialog.as_mut()
+                {
+                    dl.set_text("distance", formcraft_engine::doc::expr::fmt_num(nv));
                 }
             }
             "solid.revolve" => {
@@ -1229,10 +1229,9 @@ impl FormCraftApp {
                     r,
                     start,
                     deg,
-                ) {
-                    if let Some(dl) = self.dialog.as_mut() {
-                        dl.set_text("angle", formcraft_engine::doc::expr::fmt_num(nv));
-                    }
+                ) && let Some(dl) = self.dialog.as_mut()
+                {
+                    dl.set_text("angle", formcraft_engine::doc::expr::fmt_num(nv));
                 }
             }
             _ => {}
