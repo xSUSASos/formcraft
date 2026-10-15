@@ -285,11 +285,9 @@ impl FeatureDialog {
                     }
                     Kind::Body | Kind::Sketch => {
                         let list = if f.kind == Kind::Body { &bodies } else { &sketches };
-                        let shown =
-                            list.iter()
-                                .find(|(id, _)| *id == f.text)
-                                .map(|(_, n)| n.clone())
-                                .unwrap_or_else(|| if f.text.is_empty() { "(default)".into() } else { f.text.clone() });
+                        let fallback = if f.text.is_empty() { "(default)".to_string() } else { f.text.clone() };
+                        let found = list.iter().find(|(id, _)| *id == f.text).map(|(_, n)| n.clone());
+                        let shown = found.unwrap_or(fallback);
                         egui::ComboBox::from_id_salt(("pick", i)).selected_text(shown).show_ui(ui, |ui| {
                             if !f.required {
                                 ui.selectable_value(&mut f.text, String::new(), "(default)");
