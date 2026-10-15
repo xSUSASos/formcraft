@@ -397,3 +397,55 @@ fn interactive_sketch_editing() {
         s.execute("sketch.edit", &json!({"sketch": id, "ops": [{"op": "move", "point": 9999, "to": [0, 0]}]})).is_err()
     );
 }
+
+#[test]
+fn transaction_is_one_undo_step_with_a_group() {
+    let mut s = session();
+    s.execute("solid.box", &json!({"size": [10, 10, 10]})).unwrap();
+    let ((), added) = s
+        .transaction("AI: plate", Some("Plate with holes"), |s| {
+            s.execute("doc.parameter", &json!({"name": "t", "expression": 5}))?;
+            s.execute("solid.box", &json!({"corner": [20, 0, 0], "size": [30, 20, "t"]}))?;
+            s.execute("solid.cylinder", &json!({"base": [35, 10, 0], "diameter": 6, "height": 5}))?;
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(added.len(), 2);
+    let d = s.document();
+    let g = d.feature(added[0]).unwrap().group.unwrap();
+    assert_eq!(d.groups[&g], "Plate with holes");
+    assert!(added.iter().all(|id| d.feature(*id).unwrap().group == Some(g)));
+    assert_eq!(s.undo_label(), Some("AI: plate"));
+    s.undo().unwrap();
+    assert_eq!(s.document().features.len(), 1);
+    assert!(s.document().parameter("t").is_none());
+    s.redo().unwrap();
+    assert_eq!(s.document().features.len(), 3);
+}
+
+#[test]
+fn failed_transaction_rolls_back_everything() {
+    let mut s = session();
+    s.execute("solid.box", &json!({"size": [10, 10, 10]})).unwrap();
+    let rev = s.document().clone();
+    let r = s.transaction("bad", None, |s| {
+        s.execute("solid.box", &json!({"corner": [20, 0, 0], "size": [5, 5, 5]}))?;
+        s.execute("solid.fillet", &json!({"edges": "vertical", "radius": 500}))?;
+        Ok(())
+    });
+    assert!(r.is_err());
+    assert_eq!(*s.document(), rev);
+    assert_eq!(s.model().bodies.len(), 1);
+    assert_eq!(s.undo_label(), Some("Add Box"));
+}
+
+#[test]
+fn fork_is_independent() {
+    let mut s = session();
+    s.execute("solid.box", &json!({"size": [10, 10, 10]})).unwrap();
+    let mut f = s.fork();
+    f.execute("solid.box", &json!({"corner": [20, 0, 0], "size": [5, 5, 5]})).unwrap();
+    assert_eq!(f.model().bodies.len(), 2);
+    assert_eq!(s.model().bodies.len(), 1);
+    assert!(!f.can_undo() || f.undo_label().is_some());
+}

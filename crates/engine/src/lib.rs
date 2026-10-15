@@ -211,6 +211,72 @@ impl Session {
         Ok(out)
     }
 
+    /// A copy of this session without history: same kernel, commands (plugins included),
+    /// document, model and selection. Used to try out changes off the UI thread (AI preview).
+    pub fn fork(&self) -> Session {
+        Session {
+            kernel: self.kernel.clone(),
+            registry: self.registry.clone(),
+            log: Vec::new(),
+            doc: self.doc.clone(),
+            undo: Vec::new(),
+            redo: Vec::new(),
+            model: self.model.clone(),
+            selection: self.selection.clone(),
+            revision: self.revision,
+            file: None,
+            saved_revision: self.revision,
+        }
+    }
+
+    /// Run several commands as one undo step. On error everything is rolled back. With
+    /// `group`, the features the transaction adds become one named group on the timeline.
+    /// Returns the closure's value and the ids of the added features.
+    pub fn transaction<T>(
+        &mut self,
+        label: &str,
+        group: Option<&str>,
+        f: impl FnOnce(&mut Session) -> Result<T>,
+    ) -> Result<(T, Vec<doc::FeatureId>)> {
+        let start = self.doc.clone();
+        let depth = self.undo.len();
+        let redo = std::mem::take(&mut self.redo);
+        let out = f(self);
+        let changed = !Arc::ptr_eq(&start, &self.doc);
+        self.undo.truncate(depth);
+        let out = match out {
+            Err(e) => {
+                self.redo = redo;
+                if changed {
+                    self.doc = start;
+                    self.regenerate();
+                }
+                return Err(e);
+            }
+            Ok(v) => v,
+        };
+        if !changed {
+            self.redo = redo;
+            return Ok((out, Vec::new()));
+        }
+        let added: Vec<doc::FeatureId> =
+            self.doc.features.iter().map(|f| f.id).filter(|id| start.feature(*id).is_none()).collect();
+        if let Some(name) = group.filter(|_| !added.is_empty()) {
+            let d = Arc::make_mut(&mut self.doc);
+            let gid = d.groups.keys().next_back().map_or(1, |k| k.saturating_add(1));
+            d.groups.insert(gid, name.to_string());
+            for f in d.features.iter_mut().filter(|f| added.contains(&f.id)) {
+                f.group = Some(gid);
+            }
+        }
+        self.undo.push((label.to_string(), start));
+        if self.undo.len() > UNDO_LIMIT {
+            self.undo.remove(0);
+        }
+        self.revision = self.revision.wrapping_add(1);
+        Ok((out, added))
+    }
+
     pub fn undo(&mut self) -> Result<String> {
         let (label, prev) = self.undo.pop().ok_or_else(|| EngineError::Failed("nothing to undo".into()))?;
         let cur = std::mem::replace(&mut self.doc, prev);

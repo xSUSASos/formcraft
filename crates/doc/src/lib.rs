@@ -83,6 +83,8 @@ pub struct Document {
     /// Timeline marker: features at index >= `marker` are rolled back (not computed).
     pub marker: Option<usize>,
     pub bodies: HashMap<BodyId, BodyState>,
+    /// Names of feature groups (`Feature::group`), e.g. one AI generation.
+    pub groups: std::collections::BTreeMap<u32, String>,
     next_id: u32,
 }
 
@@ -95,6 +97,7 @@ impl Default for Document {
             features: Vec::new(),
             marker: None,
             bodies: HashMap::new(),
+            groups: Default::default(),
             next_id: 1,
         }
     }
