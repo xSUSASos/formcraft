@@ -158,6 +158,29 @@ fn doc_export(s: &mut Session, p: &Value) -> Result<Value> {
     )
 }
 
+fn doc_save(s: &mut Session, p: &Value) -> Result<Value> {
+    let path = match params::opt_str(p, "path") {
+        Some(x) => PathBuf::from(x),
+        None => s
+            .file()
+            .map(PathBuf::from)
+            .ok_or_else(|| EngineError::InvalidParams("missing `path` (the design was never saved)".into()))?,
+    };
+    let path = if path.extension().is_none() { path.with_extension("fcraft") } else { path };
+    formcraft_io::fcraft::save(s.document(), None, &path)?;
+    s.mark_saved(path.clone());
+    Ok(json!({"path": path.display().to_string(), "message": format!("Saved {}", path.display())}))
+}
+
+fn doc_open(s: &mut Session, p: &Value) -> Result<Value> {
+    let path = PathBuf::from(params::str(p, "path")?);
+    let (doc, _) = formcraft_io::fcraft::open(&path)?;
+    s.load(doc);
+    s.mark_saved(path.clone());
+    let errors = s.model().error_count();
+    Ok(json!({"path": path.display().to_string(), "errors": errors, "message": format!("Opened {}", path.display())}))
+}
+
 fn doc_parameter(s: &mut Session, p: &Value) -> Result<Value> {
     let name = params::str(p, "name")?.to_string();
     let e = params::expr(p, "expression")?;
@@ -453,6 +476,18 @@ pub(crate) fn register(r: &mut Registry) {
             CommandSpec::new("doc.new", "New Design", "Start an empty design (the current one is discarded).")
                 .params(json!({"type": "object", "properties": {"name": {"type": "string"}}})),
             h(doc_new),
+        ),
+        (
+            CommandSpec::new("doc.save", "Save", "Save the design as .fcraft (to `path`, or to the file it came from).")
+                .params(json!({"type": "object", "properties": {"path": {"type": "string"}}}))
+                .shortcut("Ctrl+S"),
+            h(doc_save),
+        ),
+        (
+            CommandSpec::new("doc.open", "Open", "Open a .fcraft design (the current one is replaced).")
+                .params(json!({"type": "object", "required": ["path"], "properties": {"path": {"type": "string"}}}))
+                .shortcut("Ctrl+O"),
+            h(doc_open),
         ),
         (
             CommandSpec::new("doc.export", "Export", "Export visible bodies (or `bodies`) to STEP (.step/.stp) or STL (.stl).")

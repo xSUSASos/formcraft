@@ -8,6 +8,7 @@
     clippy::unreachable
 )]
 
+pub mod fcraft;
 pub mod stl;
 
 use std::path::Path;

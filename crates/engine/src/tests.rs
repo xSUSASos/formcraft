@@ -302,3 +302,25 @@ fn revolve_and_errors_by_commands() {
     assert!(s.execute("solid.hole", &json!({"points": [], "diameter": 3})).is_err());
     assert_eq!(s.model().error_count(), 0, "refused edits leave no red features");
 }
+
+#[test]
+fn save_and_open_round_trip() {
+    let mut s = session();
+    s.execute("doc.parameter", &json!({"name": "L", "expression": 60})).unwrap();
+    s.execute("sketch.create", &json!({"rectangles": [{"corner": [0, 0], "size": ["L", 20]}]})).unwrap();
+    s.execute("solid.extrude", &json!({"distance": 4})).unwrap();
+    assert!(s.is_dirty());
+    let path = std::env::temp_dir().join(format!("fc-save-{}", std::process::id()));
+    let r = s.execute("doc.save", &json!({"path": path.to_str().unwrap()})).unwrap();
+    assert!(!s.is_dirty());
+    let saved = r["path"].as_str().unwrap().to_string();
+    assert!(saved.ends_with(".fcraft"));
+    let v = vol0(&mut s);
+    let mut t = session();
+    t.execute("doc.open", &json!({"path": saved})).unwrap();
+    assert!((vol0(&mut t) - v).abs() < 1e-9);
+    assert_eq!(t.document().parameters.len(), 1);
+    t.execute("doc.save", &json!({})).unwrap();
+    let _ = std::fs::remove_file(&saved);
+    assert!(t.execute("doc.open", &json!({"path": "nope.fcraft"})).is_err());
+}

@@ -47,6 +47,7 @@ egui-wgpu = "0.36"
 # must match egui-wgpu's wgpu
 wgpu = { version = "30", default-features = false, features = ["wgsl", "dx12", "vulkan", "metal", "gles"] }
 pollster = "0.4"
+zip = { version = "9", default-features = false, features = ["deflate"] }
 egui_kittest = "0.36"
 rfd = "0.17"
 image = { version = "0.25", default-features = false, features = ["png"] }

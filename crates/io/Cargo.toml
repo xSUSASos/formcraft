@@ -16,3 +16,4 @@ formcraft-doc = { workspace = true }
 formcraft-tess = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+zip = { workspace = true }

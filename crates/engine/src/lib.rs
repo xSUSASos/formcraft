@@ -84,6 +84,10 @@ pub struct Session {
     selection: Selection,
     /// Bumped on every document change (views re-tessellate when it changes).
     revision: u64,
+    /// File the document was last opened from / saved to.
+    file: Option<std::path::PathBuf>,
+    /// Revision at the last save/open (unsaved changes when it differs).
+    saved_revision: u64,
 }
 
 const LOG_LIMIT: usize = 1000;
@@ -106,6 +110,8 @@ impl Session {
             model: regen::Model::default(),
             selection: Selection::default(),
             revision: 0,
+            file: None,
+            saved_revision: 0,
         };
         builtin::register(&mut s.registry);
         modeling::register(&mut s.registry);
@@ -123,6 +129,19 @@ impl Session {
 
     pub fn revision(&self) -> u64 {
         self.revision
+    }
+
+    pub fn file(&self) -> Option<&std::path::Path> {
+        self.file.as_deref()
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        self.revision != self.saved_revision
+    }
+
+    pub(crate) fn mark_saved(&mut self, path: std::path::PathBuf) {
+        self.file = Some(path);
+        self.saved_revision = self.revision;
     }
 
     pub fn selection(&self) -> &Selection {
@@ -152,7 +171,9 @@ impl Session {
         self.undo.clear();
         self.redo.clear();
         self.selection.clear();
+        self.file = None;
         self.regenerate();
+        self.saved_revision = self.revision;
     }
 
     fn regenerate(&mut self) {
