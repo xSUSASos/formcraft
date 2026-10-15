@@ -7,16 +7,18 @@
 use std::path::PathBuf;
 
 use egui::{Align2, Color32, FontId, Id, Panel, Pos2, Rect, Sense, Stroke, Ui, Vec2, pos2};
-use formcraft_engine::doc::BodyId;
+use formcraft_engine::doc::{BodyId, FeatureId};
 use formcraft_engine::{Pick, Session};
 use formcraft_render::camera::{Camera, Projection};
 use formcraft_render::grid::{self, LineKind};
 use glam::{DVec2, DVec3};
 use serde_json::Value;
 
+use crate::dialog::{FeatureDialog, Outcome};
 use crate::icons;
 use crate::layout::{Dock, Layout, VisualStyle};
 use crate::theme::{ThemeKind, Tokens};
+use crate::timeline;
 use crate::toolbar::{self, Action};
 use crate::viewcube::{self, CubeAction};
 use crate::viewport::Viewport;
@@ -41,6 +43,8 @@ pub struct AppOptions {
     pub view: Option<String>,
     /// Run a command script at startup (demos, screenshots).
     pub script: Option<PathBuf>,
+    /// Open the dialog of this command at startup (screenshots).
+    pub dialog: Option<String>,
 }
 
 /// Browser tree visibility toggles (Origin and bodies get real items in Phase 2).
@@ -84,6 +88,11 @@ pub struct FormCraftApp {
     viewport: Viewport,
     /// Canvas rectangle of the last frame (tests).
     canvas_rect: Rect,
+    dialog: Option<FeatureDialog>,
+    /// Live preview while the dialog is open: (model, key).
+    preview: Option<(formcraft_engine::regen::Model, u64)>,
+    preview_counter: u64,
+    rename: Option<(FeatureId, String)>,
 }
 
 impl FormCraftApp {
@@ -134,6 +143,10 @@ impl FormCraftApp {
             cube_area: Rect::NOTHING,
             viewport: Viewport::new(None),
             canvas_rect: Rect::NOTHING,
+            dialog: None,
+            preview: None,
+            preview_counter: 0,
+            rename: None,
         };
         if let Some(path) = app.options.script.clone() {
             app.run_script_file(&path);
@@ -144,6 +157,9 @@ impl FormCraftApp {
         if let Some(v) = view {
             app.apply_named_view(&v.to_uppercase());
             app.fit_keep_direction();
+        }
+        if let Some(d) = app.options.dialog.clone() {
+            app.open_dialog(&d, &Value::Null, None);
         }
         app
     }
@@ -193,12 +209,126 @@ impl FormCraftApp {
             }
             _ => {}
         }
+        // Toolbar/menu invocation of a modelling command with parameters opens its dialog.
+        if params.is_null() && self.wants_dialog(id) {
+            self.open_dialog(id, &serde_json::json!({}), None);
+            return;
+        }
         self.status = match self.session.execute(id, &params) {
             Ok(v) => {
                 v.get("message").and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| format!("{id}: done"))
             }
             Err(e) => format!("{id}: {e}"),
         };
+    }
+
+    fn wants_dialog(&self, id: &str) -> bool {
+        self.session.registry().get(id).is_some_and(|c| {
+            c.spec.undoable && c.spec.params.get("properties").and_then(Value::as_object).is_some_and(|p| !p.is_empty())
+        })
+    }
+
+    fn open_dialog(&mut self, id: &str, initial: &Value, editing: Option<FeatureId>) {
+        self.dialog = FeatureDialog::new(&self.session, id, initial, editing);
+        self.preview = None;
+        if self.dialog.is_none() {
+            self.status = format!("{id}: not available");
+        }
+    }
+
+    /// Edit a timeline feature: its dialog, prefilled.
+    fn edit_feature(&mut self, id: FeatureId) {
+        match self.session.execute("feature.params", &serde_json::json!({"feature": id.0})) {
+            Ok(v) => match v.get("command").and_then(Value::as_str) {
+                Some(cmd) => {
+                    let cmd = cmd.to_string();
+                    let params = v.get("params").cloned().unwrap_or(Value::Null);
+                    self.open_dialog(&cmd, &params, Some(id));
+                }
+                None => self.status = "Sketches are edited in sketch mode".into(),
+            },
+            Err(e) => self.status = e.to_string(),
+        }
+    }
+
+    fn feature_dialog(&mut self, ui: &mut Ui, t: &Tokens) {
+        let Some(mut dlg) = self.dialog.take() else { return };
+        let mut outcome = Outcome::None;
+        let mut open = true;
+        egui::Window::new(dlg.title.clone())
+            .id(Id::new("feature_dialog"))
+            .anchor(Align2::RIGHT_TOP, Vec2::new(-170.0, 130.0))
+            .resizable(false)
+            .collapsible(false)
+            .open(&mut open)
+            .show(ui.ctx(), |ui| outcome = dlg.ui(ui, &self.session, t));
+        // Live preview when the parameters changed.
+        if let Ok((cmd, params)) = dlg.invocation()
+            && dlg.previewed.as_ref() != Some(&params)
+        {
+            dlg.previewed = Some(params.clone());
+            match self.session.preview(&cmd, &params) {
+                Ok(m) => {
+                    self.preview_counter += 1;
+                    self.preview = Some((m, u64::MAX - self.preview_counter));
+                    dlg.error = None;
+                }
+                Err(e) => {
+                    self.preview = None;
+                    dlg.error = Some(e.to_string());
+                }
+            }
+        }
+        match outcome {
+            Outcome::Ok => match dlg.invocation() {
+                Ok((cmd, params)) => match self.session.execute(&cmd, &params) {
+                    Ok(v) => {
+                        self.status = v.get("message").and_then(Value::as_str).unwrap_or("Done").to_string();
+                        self.preview = None;
+                        return;
+                    }
+                    Err(e) => dlg.error = Some(e.to_string()),
+                },
+                Err(e) => dlg.error = Some(e),
+            },
+            Outcome::Cancel => {
+                self.preview = None;
+                return;
+            }
+            Outcome::None => {}
+        }
+        if !open {
+            self.preview = None;
+            return;
+        }
+        self.dialog = Some(dlg);
+    }
+
+    fn rename_dialog(&mut self, ui: &mut Ui) {
+        let Some((id, mut name)) = self.rename.take() else { return };
+        let mut done = None;
+        egui::Window::new("Rename")
+            .id(Id::new("rename_dialog"))
+            .collapsible(false)
+            .resizable(false)
+            .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
+            .show(ui.ctx(), |ui| {
+                let r = ui.text_edit_singleline(&mut name);
+                r.request_focus();
+                ui.horizontal(|ui| {
+                    if ui.button("OK").clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        done = Some(true);
+                    }
+                    if ui.button("Cancel").clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                        done = Some(false);
+                    }
+                });
+            });
+        match done {
+            Some(true) => self.run("feature.rename", serde_json::json!({"feature": id.0, "name": name})),
+            Some(false) => {}
+            None => self.rename = Some((id, name)),
+        }
     }
 
     // ------------------------------------------------------------------ application bar
@@ -368,7 +498,33 @@ impl FormCraftApp {
                     }
                 });
                 egui::CollapsingHeader::new("Sketches").default_open(true).show(ui, |ui| {
-                    ui.label(egui::RichText::new("(none)").color(t.text_dim));
+                    let sketches: Vec<(FeatureId, String)> = self
+                        .session
+                        .document()
+                        .features
+                        .iter()
+                        .filter(|f| matches!(f.kind, formcraft_engine::doc::FeatureKind::Sketch { .. }))
+                        .map(|f| (f.id, f.name.clone()))
+                        .collect();
+                    if sketches.is_empty() {
+                        ui.label(egui::RichText::new("(none)").color(t.text_dim));
+                    }
+                    for (id, name) in sketches {
+                        ui.horizontal(|ui| {
+                            let (r, _) = ui.allocate_exact_size(Vec2::splat(16.0), Sense::hover());
+                            crate::icons::paint(ui.painter(), r, "sketch", t.text, t);
+                            let dof = self.session.model().sketch(id).map(|s| s.dof);
+                            let resp = ui.selectable_label(false, &name);
+                            let resp = match dof {
+                                Some(0) => resp.on_hover_text("Fully constrained"),
+                                Some(n) => resp.on_hover_text(format!("{n} degrees of freedom")),
+                                None => resp.on_hover_text("Failed to compute"),
+                            };
+                            if resp.double_clicked() {
+                                self.edit_feature(id);
+                            }
+                        });
+                    }
                 });
                 egui::CollapsingHeader::new("Bodies").default_open(true).show(ui, |ui| {
                     let bodies: Vec<(BodyId, String, bool)> =
@@ -447,39 +603,39 @@ impl FormCraftApp {
         if !self.layout.timeline.open {
             return;
         }
+        let mut action = None;
         Panel::bottom("timeline")
             .exact_size(self.layout.timeline.size)
             .frame(egui::Frame::new().fill(t.panel).inner_margin(egui::Margin::symmetric(8, 6)))
-            .show(ui, |ui| {
-                ui.horizontal_centered(|ui| {
-                    for (icon, tip) in [
-                        ("tl_start", "Move to beginning"),
-                        ("tl_back", "Step back"),
-                        ("tl_play", "Play"),
-                        ("tl_fwd", "Step forward"),
-                        ("tl_end", "Move to end"),
-                    ] {
-                        let _ = icons::button(ui, t, icon, tip, 18.0, false, false);
+            .show(ui, |ui| action = timeline::ui(ui, t, &self.session));
+        let Some(a) = action else { return };
+        use serde_json::json;
+        match a {
+            timeline::Action::Edit(id) => self.edit_feature(id),
+            timeline::Action::Rename(id) => {
+                let name = self.session.document().feature(id).map(|f| f.name.clone()).unwrap_or_default();
+                self.rename = Some((id, name));
+            }
+            timeline::Action::Suppress(id, on) => {
+                self.run("feature.suppress", json!({"feature": id.0, "suppressed": on}))
+            }
+            timeline::Action::Delete(id) => self.run("feature.delete", json!({"feature": id.0})),
+            timeline::Action::Reorder(id, to) => self.run("timeline.reorder", json!({"feature": id.0, "index": to})),
+            timeline::Action::Marker(m) => self.run("timeline.marker", json!({"index": m})),
+            timeline::Action::Explain(id) => {
+                let r = if self.session.registry().get("ai.explain").is_some() {
+                    self.session.execute("ai.explain", &json!({"feature": id.0}))
+                } else {
+                    self.session.execute("feature.params", &json!({"feature": id.0}))
+                };
+                self.status = match r {
+                    Ok(v) => {
+                        v.get("message").and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| v.to_string())
                     }
-                    ui.separator();
-                    let (rect, _) =
-                        ui.allocate_exact_size(Vec2::new(ui.available_width() - 30.0, 24.0), Sense::hover());
-                    ui.painter().rect_filled(rect, 3.0, t.panel_header);
-                    ui.painter().text(
-                        rect.left_center() + Vec2::new(10.0, 0.0),
-                        Align2::LEFT_CENTER,
-                        "Timeline: no features yet",
-                        FontId::proportional(12.0),
-                        t.text_dim,
-                    );
-                    // History marker at the end of the (empty) timeline.
-                    let x = rect.left() + 4.0;
-                    ui.painter().line_segment(
-                        [pos2(x, rect.top() - 2.0), pos2(x, rect.bottom() + 2.0)],
-                        Stroke::new(3.0, t.accent),
-                    );
-                });
-            });
+                    Err(e) => e.to_string(),
+                };
+            }
+        }
     }
 
     fn text_commands(&mut self, ui: &mut Ui, t: &Tokens) {
@@ -607,10 +763,19 @@ impl FormCraftApp {
 
         self.navigate(ui, &resp, rect, size);
 
+        let shown = self.preview.as_ref().map(|(m, k)| (m, *k));
         // Bodies, grid and axes on the GPU (with depth); without a GPU (tests) the grid is
         // painted in 2D below.
-        let gpu =
-            self.viewport.paint(ui, rect, &self.session, &self.camera, t, self.layout.grid, self.layout.visual_style);
+        let gpu = self.viewport.paint(
+            ui,
+            rect,
+            &self.session,
+            shown,
+            &self.camera,
+            t,
+            self.layout.grid,
+            self.layout.visual_style,
+        );
         self.handle_picking(ui, &resp, rect, size);
 
         let origin = rect.min.to_vec2();
@@ -908,6 +1073,8 @@ impl FormCraftApp {
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(Color32::TRANSPARENT))
             .show(ui, |ui| self.canvas(ui, &t));
+        self.feature_dialog(ui, &t);
+        self.rename_dialog(ui);
         self.handle_screenshot(ui);
     }
 }

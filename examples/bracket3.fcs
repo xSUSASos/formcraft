@@ -1,0 +1,8 @@
+# Phase 3 bracket: parametric sketch, extrude, fillets, counterbored holes.
+doc.parameter {"name": "L", "expression": 60}
+doc.parameter {"name": "W", "expression": 40}
+doc.parameter {"name": "T", "expression": 5}
+sketch.create {"plane": "XY", "rectangles": [{"corner": [0, 0], "size": ["L", "W"]}]}
+solid.extrude {"distance": "T"}
+solid.fillet {"edges": "vertical", "radius": 3}
+solid.hole {"points": [[8, 8, 5], ["L-8", 8, 5], [8, "W-8", 5], ["L-8", "W-8", 5]], "diameter": 3.4, "counterbore": {"diameter": 6.5, "depth": 2}}

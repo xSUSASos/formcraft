@@ -5,6 +5,7 @@ use std::collections::HashMap;
 
 use egui::{Color32, Rect, TextureId};
 use formcraft_engine::doc::BodyId;
+use formcraft_engine::regen::Model;
 use formcraft_engine::{Pick, Session};
 use formcraft_kernel::Mesh;
 use formcraft_render::camera::Camera;
@@ -52,15 +53,15 @@ impl Viewport {
         }
     }
 
-    /// Re-tessellate bodies when the document changed.
-    fn sync(&mut self, s: &Session) {
-        if self.revision == Some(s.revision()) {
+    /// Re-tessellate bodies when the shown model changed (`key` identifies it).
+    fn sync(&mut self, s: &Session, model: &Model, key: u64) {
+        if self.revision == Some(key) {
             return;
         }
-        self.revision = Some(s.revision());
+        self.revision = Some(key);
         self.meshes.clear();
         self.tessellation_error = None;
-        for b in &s.model().bodies {
+        for b in &model.bodies {
             match formcraft_tess::mesh(s.kernel().as_ref(), &b.shape, formcraft_tess::Quality::Display) {
                 Ok(m) => {
                     self.meshes.insert(b.id.0 as u64, m);
@@ -72,9 +73,9 @@ impl Viewport {
     }
 
     /// Upload or re-colour meshes for the current selection/hover.
-    fn upload(&mut self, s: &Session, t: &Tokens) {
+    fn upload(&mut self, s: &Session, t: &Tokens, key: u64) {
         let sel = s.selection();
-        let state = (sel.items.clone(), sel.hover, s.revision());
+        let state = (sel.items.clone(), sel.hover, key);
         if self.painted.as_ref() == Some(&state) {
             return;
         }
@@ -107,7 +108,7 @@ impl Viewport {
             };
             let (v, i) = scene::mesh_vertices(m, base, &face);
             let e = scene::edge_vertices(m, edge, &edge_c);
-            if self.painted.as_ref().is_some_and(|p| p.2 == s.revision()) && r.has_mesh(*key) {
+            if self.painted.as_ref().is_some_and(|p| p.2 == state.2) && r.has_mesh(*key) {
                 r.recolor(*key, &v, &e);
             } else {
                 r.set_mesh(*key, &v, &i, &e);
@@ -124,16 +125,18 @@ impl Viewport {
         ui: &mut egui::Ui,
         rect: Rect,
         s: &Session,
+        shown: Option<(&Model, u64)>,
         cam: &Camera,
         t: &Tokens,
         grid: bool,
         style: VisualStyle,
     ) -> bool {
-        self.sync(s);
+        let (model, key) = shown.unwrap_or((s.model(), s.revision()));
+        self.sync(s, model, key);
         if self.gpu.is_none() {
             return false;
         }
-        self.upload(s, t);
+        self.upload(s, t, key);
         let Some((state, r)) = self.gpu.as_mut() else { return false };
         let ppp = ui.ctx().pixels_per_point();
         let size = [(rect.width() * ppp).round().max(1.0) as u32, (rect.height() * ppp).round().max(1.0) as u32];
@@ -144,8 +147,7 @@ impl Viewport {
             y: rgba(t.axis_y),
             z: rgba(t.axis_z),
         };
-        let items = s
-            .model()
+        let items = model
             .bodies
             .iter()
             .map(|b| Item {

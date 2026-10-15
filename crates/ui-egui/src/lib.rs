@@ -10,9 +10,11 @@
 )]
 
 mod app;
+mod dialog;
 pub mod icons;
 pub mod layout;
 pub mod theme;
+mod timeline;
 mod toolbar;
 mod viewcube;
 mod viewport;
