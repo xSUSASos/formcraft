@@ -324,9 +324,9 @@ pub fn parse_shortcut(s: &str) -> Option<(egui::Modifiers, egui::Key)> {
     let mut key = None;
     for part in s.split('+') {
         match part.trim().to_ascii_lowercase().as_str() {
-            "ctrl" | "cmd" => m = m | egui::Modifiers::COMMAND,
-            "shift" => m = m | egui::Modifiers::SHIFT,
-            "alt" => m = m | egui::Modifiers::ALT,
+            "ctrl" | "cmd" => m |= egui::Modifiers::COMMAND,
+            "shift" => m |= egui::Modifiers::SHIFT,
+            "alt" => m |= egui::Modifiers::ALT,
             k => key = egui::Key::from_name(&k.to_ascii_uppercase()).or_else(|| egui::Key::from_name(k)),
         }
     }
