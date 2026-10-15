@@ -1,0 +1,15 @@
+[package]
+name = "spike-truck"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+truck-modeling = "0.6"
+truck-shapeops = "0.4"
+truck-stepio = "0.3"
+truck-meshalgo = "0.4"
+truck-topology = "*"
+truck-polymesh = "*"

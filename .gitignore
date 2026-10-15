@@ -1,0 +1,8 @@
+/target
+**/target
+spikes/*/out/
+spikes/*/build.log
+spikes/*/Cargo.lock
+/logs/
+*.gguf
+/plan/
