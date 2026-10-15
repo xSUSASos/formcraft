@@ -1,0 +1,7 @@
+# Bushing: rectangle r 8..12, z 0..30 revolved about Z (tube OD 24, ID 16, length 30).
+# V = pi*(Ro^2 - Ri^2)*H = pi*(144 - 64)*30 = 2400*pi = 7539.822
+doc.parameter {"name": "Ri", "expression": 8}
+doc.parameter {"name": "Ro", "expression": 12}
+doc.parameter {"name": "H", "expression": 30}
+sketch.create {"plane": "XZ", "polylines": [{"points": [["Ri", 0], ["Ro", 0], ["Ro", "H"], ["Ri", "H"]]}]}
+solid.revolve {"axis": "Z"}

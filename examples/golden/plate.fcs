@@ -1,0 +1,9 @@
+# Plate 100x60x8 with four 6 mm through holes 10 mm from the corners.
+# V = (L*W - 4*pi*(d/2)^2) * T = (6000 - 36*pi) * 8 = 47095.221
+doc.parameter {"name": "L", "expression": 100}
+doc.parameter {"name": "W", "expression": 60}
+doc.parameter {"name": "T", "expression": 8}
+doc.parameter {"name": "d", "expression": 6}
+doc.parameter {"name": "edge", "expression": 10}
+sketch.create {"plane": "XY", "rectangles": [{"corner": [0, 0], "size": ["L", "W"]}], "circles": [{"center": ["edge", "edge"], "diameter": "d"}, {"center": ["L-edge", "edge"], "diameter": "d"}, {"center": ["edge", "W-edge"], "diameter": "d"}, {"center": ["L-edge", "W-edge"], "diameter": "d"}]}
+solid.extrude {"distance": "T"}

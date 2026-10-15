@@ -1,0 +1,7 @@
+# Washer M8: OD 16, ID 8.4, thickness 1.6.
+# V = pi/4*(16^2 - 8.4^2)*1.6 = 233.031
+doc.parameter {"name": "OD", "expression": 16}
+doc.parameter {"name": "ID", "expression": 8.4}
+doc.parameter {"name": "T", "expression": 1.6}
+sketch.create {"plane": "XY", "circles": [{"center": [0, 0], "diameter": "OD"}, {"center": [0, 0], "diameter": "ID"}]}
+solid.extrude {"distance": "T"}

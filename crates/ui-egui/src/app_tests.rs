@@ -291,3 +291,68 @@ fn parameters_window_edits_parameters() {
     h.run_steps(2);
     assert_eq!(h.state_mut().session().document().parameters.len(), 1);
 }
+
+/// Phase 3 acceptance: a bracket built with mouse and keyboard only, then a parameter change.
+#[test]
+fn acceptance_bracket_with_the_mouse() {
+    let mut h = harness();
+    // Parameters first (Change Parameters table → doc.parameter).
+    h.state_mut().run("doc.parameter", serde_json::json!({"name": "L", "expression": "60"}));
+    // Create Sketch on XY via the toolbar command and the plane picker.
+    h.state_mut().run("sketch.create", Value::Null);
+    assert!(h.state().plane_picker);
+    h.state_mut().create_sketch(serde_json::json!("XY"));
+    h.state_mut().camera.distance = 300.0;
+    h.state_mut().camera.target = DVec3::new(20.0, 15.0, 0.0);
+    h.run_steps(3);
+    // R, then two clicks.
+    h.event(Event::PointerMoved(canvas_point()));
+    key(&mut h, egui::Key::R, Modifiers::NONE);
+    assert_eq!(h.state().sketch_mode.as_ref().map(|m| m.tool), Some(Tool::Rectangle));
+    let (a, b) = (sketch_px(&h, 0.0, 0.0), sketch_px(&h, 40.0, 30.0));
+    click(&mut h, a);
+    click(&mut h, b);
+    // D, click the bottom edge, type "L", Enter.
+    key(&mut h, egui::Key::D, Modifiers::NONE);
+    let bottom = sketch_px(&h, 20.0, 0.0);
+    click(&mut h, bottom);
+    let typed = h.state_mut().sketch_mode.as_mut().map(|m| m.set_pending_dimension_text("L")).unwrap_or(false);
+    assert!(typed, "the dimension field is open");
+    key(&mut h, egui::Key::Enter, Modifiers::NONE);
+    let sk = h.state().sketch_mode.as_ref().unwrap().sketch;
+    assert_eq!(h.state().session.model().sketch(sk).unwrap().sketch.dimensions.len(), 1, "{}", h.state().status);
+    // Finish Sketch, E → Extrude dialog, distance 5, OK.
+    h.state_mut().finish_sketch();
+    h.run_steps(2);
+    key(&mut h, egui::Key::E, Modifiers::NONE);
+    assert_eq!(h.state().dialog.as_ref().map(|d| d.command.as_str()), Some("solid.extrude"));
+    h.state_mut().dialog.as_mut().unwrap().set_text("distance", "5".into());
+    h.run_steps(2);
+    h.state_mut().dialog_ok();
+    assert_eq!(h.state().session.model().bodies.len(), 1, "{}", h.state().status);
+    // F → Fillet dialog: vertical edges, R3.
+    key(&mut h, egui::Key::F, Modifiers::NONE);
+    {
+        let d = h.state_mut().dialog.as_mut().unwrap();
+        d.set_text("radius", "3".into());
+        d.set_text("edges", "vertical".into());
+    }
+    h.run_steps(2);
+    h.state_mut().dialog_ok();
+    let vol = |h: &mut Harness<'_, FormCraftApp>| {
+        h.state_mut().session().execute("model.inspect", &serde_json::json!({})).unwrap()["bodies"][0]["volume"]
+            .as_f64()
+            .unwrap()
+    };
+    let pi = std::f64::consts::PI;
+    let want = |l: f64| (l * 30.0 - (4.0 - pi) * 9.0) * 5.0;
+    assert!((vol(&mut h) - want(60.0)).abs() < 1e-3, "{}", vol(&mut h));
+    // Change the parameter: the whole history rebuilds.
+    h.state_mut().run("doc.parameter", serde_json::json!({"name": "L", "expression": "80"}));
+    h.run_steps(2);
+    assert_eq!(h.state().session.model().error_count(), 0);
+    assert!((vol(&mut h) - want(80.0)).abs() < 1e-3, "{}", vol(&mut h));
+    // Timeline: Sketch, Extrude, Fillet.
+    let names: Vec<String> = h.state().session.document().features.iter().map(|f| f.name.clone()).collect();
+    assert_eq!(names, vec!["Sketch1", "Extrude1", "Fillet1"]);
+}

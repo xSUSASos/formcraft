@@ -1,0 +1,5 @@
+# Enclosure 80x50x30, open top, wall 2.
+# V = 80*50*30 - 76*46*28 = 120000 - 97888 = 22112.000
+doc.parameter {"name": "wall", "expression": 2}
+solid.box {"size": [80, 50, 30]}
+solid.shell {"faces": "top", "thickness": "wall"}

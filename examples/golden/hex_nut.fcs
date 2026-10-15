@@ -1,0 +1,5 @@
+# Hex nut: regular hexagon, circumradius 10, height 6, central 8 mm hole.
+# V = (3*sqrt(3)/2*R^2 - pi*4^2) * 6 = (259.808 - 50.265)*6 = 1257.253
+doc.parameter {"name": "H", "expression": 6}
+sketch.create {"plane": "XY", "polylines": [{"points": [[10.0, 0.0], [5.0, 8.660254038], [-5.0, 8.660254038], [-10.0, 0.0], [-5.0, -8.660254038], [5.0, -8.660254038]], "closed": true}], "circles": [{"center": [0, 0], "diameter": 8}]}
+solid.extrude {"distance": "H"}

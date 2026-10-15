@@ -597,6 +597,26 @@ impl FormCraftApp {
         self.dialog = Some(dlg);
     }
 
+    /// Press OK in the open feature dialog (tests, keyboard).
+    pub fn dialog_ok(&mut self) {
+        let Some(dlg) = self.dialog.take() else { return };
+        match dlg
+            .invocation()
+            .map_err(EngineErrorText)
+            .and_then(|(cmd, p)| self.session.execute(&cmd, &p).map_err(|e| EngineErrorText(e.to_string())))
+        {
+            Ok(v) => {
+                self.status = v.get("message").and_then(Value::as_str).unwrap_or("Done").to_string();
+                self.preview = None;
+            }
+            Err(e) => {
+                let mut dlg = dlg;
+                dlg.error = Some(e.0);
+                self.dialog = Some(dlg);
+            }
+        }
+    }
+
     fn rename_dialog(&mut self, ui: &mut Ui) {
         let Some((id, mut name)) = self.rename.take() else { return };
         let mut done = None;
@@ -1508,6 +1528,8 @@ impl FormCraftApp {
         self.handle_screenshot(ui);
     }
 }
+
+struct EngineErrorText(String);
 
 fn eye_toggle(ui: &mut Ui, t: &Tokens, visible: &mut bool) {
     let (rect, resp) = ui.allocate_exact_size(Vec2::splat(16.0), Sense::click());

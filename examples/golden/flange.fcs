@@ -1,0 +1,7 @@
+# Flange: disk D120 x 12, six 9 mm holes on a 90 mm bolt circle, central 30 mm bore.
+# V = pi*12*(60^2 - 6*4.5^2 - 15^2) = 12*pi*3253.5 = 122654.060
+doc.parameter {"name": "T", "expression": 12}
+sketch.create {"plane": "XY", "circles": [{"center": [0, 0], "diameter": 120}]}
+solid.extrude {"distance": "T"}
+solid.hole {"points": [[45.0, 0.0, 12], [22.5, 38.97114317, 12], [-22.5, 38.97114317, 12], [-45.0, 0.0, 12], [-22.5, -38.97114317, 12], [22.5, -38.97114317, 12]], "diameter": 9}
+solid.hole {"points": [[0, 0, 12]], "diameter": 30}

@@ -100,6 +100,18 @@ impl SketchMode {
         }
     }
 
+    /// Replace the text of the open dimension field (tests).
+    #[cfg(test)]
+    pub fn set_pending_dimension_text(&mut self, text: &str) -> bool {
+        match self.dim_input.as_mut() {
+            Some((_, t, _)) => {
+                *t = text.to_string();
+                true
+            }
+            None => false,
+        }
+    }
+
     /// No tool operation in progress (right-click may open the marking menu).
     pub fn idle(&self) -> bool {
         self.pending.is_empty() && self.dim_input.is_none()

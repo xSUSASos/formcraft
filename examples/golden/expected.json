@@ -1,0 +1,92 @@
+{
+  "plate": {
+    "volume": 47095.221,
+    "bbox_size": [
+      100,
+      60,
+      8
+    ],
+    "bodies": 1
+  },
+  "bushing": {
+    "volume": 7539.822,
+    "bbox_size": [
+      24,
+      24,
+      30
+    ],
+    "bodies": 1
+  },
+  "flange": {
+    "volume": 122654.06,
+    "bbox_size": [
+      120,
+      120,
+      12
+    ],
+    "bodies": 1
+  },
+  "l_bracket": {
+    "volume": 21000,
+    "bbox_size": [
+      60,
+      40,
+      35
+    ],
+    "bodies": 1
+  },
+  "washer": {
+    "volume": 233.031,
+    "bbox_size": [
+      16,
+      16,
+      1.6
+    ],
+    "bodies": 1
+  },
+  "hex_nut": {
+    "volume": 1257.253,
+    "bbox_size": [
+      20,
+      17.3205,
+      6
+    ],
+    "bodies": 1
+  },
+  "shaft_keyway": {
+    "volume": 14853.591,
+    "bbox_size": [
+      50,
+      20,
+      19.5394
+    ],
+    "bodies": 1
+  },
+  "enclosure": {
+    "volume": 22112,
+    "bbox_size": [
+      80,
+      50,
+      30
+    ],
+    "bodies": 1
+  },
+  "pulley": {
+    "volume": 50064.421,
+    "bbox_size": [
+      60,
+      60,
+      20
+    ],
+    "bodies": 1
+  },
+  "rounded_plate": {
+    "volume": 39128.805,
+    "bbox_size": [
+      80,
+      50,
+      10
+    ],
+    "bodies": 1
+  }
+}

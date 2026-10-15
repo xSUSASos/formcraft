@@ -1,0 +1,7 @@
+# L bracket: base 60x40x5 plus upright 60x5x30 sitting on it (no overlap), joined.
+# V = 60*40*5 + 60*5*30 = 12000 + 9000 = 21000.000
+doc.parameter {"name": "L", "expression": 60}
+doc.parameter {"name": "base_t", "expression": 5}
+solid.box {"size": ["L", 40, "base_t"]}
+solid.box {"corner": [0, 0, "base_t"], "size": ["L", 5, 30]}
+solid.combine {"target": "Body1", "tool": "Body2", "operation": "join"}

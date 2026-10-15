@@ -1,0 +1,10 @@
+# Plate 80x50x10, vertical edges filleted R5, two counterbored holes (d5, cbore d9 x 3 deep from top).
+# V = (80*50 - (4-pi)*5^2)*10 - 2*pi*(4.5^2*3 + 2.5^2*7) = 39128.805
+doc.parameter {"name": "L", "expression": 80}
+doc.parameter {"name": "W", "expression": 50}
+doc.parameter {"name": "T", "expression": 10}
+doc.parameter {"name": "r", "expression": 5}
+sketch.create {"plane": "XY", "rectangles": [{"corner": [0, 0], "size": ["L", "W"]}]}
+solid.extrude {"distance": "T"}
+solid.fillet {"edges": "vertical", "radius": "r"}
+solid.hole {"points": [[15, "W/2", "T"], ["L-15", "W/2", "T"]], "diameter": 5, "counterbore": {"diameter": 9, "depth": 3}}

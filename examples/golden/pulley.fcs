@@ -1,0 +1,6 @@
+# Pulley: (r, z) profile revolved about Z; V-groove between z=6..14 on the r=30 rim.
+# Profile (r,z): (6,0) (30,0) (30,6) (24,10) (30,14) (30,20) (6,20)
+# Shoelace: A = 456.0000 mm^2, centroid r = 17.473684 (polygon centroid formula)
+# Pappus: V = 2*pi*r_c*A = 50064.421
+sketch.create {"plane": "XZ", "polylines": [{"points": [[6, 0], [30, 0], [30, 6], [24, 10], [30, 14], [30, 20], [6, 20]]}]}
+solid.revolve {"axis": "Z"}

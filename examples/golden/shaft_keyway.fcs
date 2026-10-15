@@ -1,0 +1,8 @@
+# Shaft D20 x 50 along X, keyway 6 wide cut from the top (z >= 7) through the full length.
+# Removed cross-section = integral_-3..3 (sqrt(100-y^2) - 7) dy = 3*sqrt(91) + 100*asin(0.3) - 42 = 17.087441
+# Top of the shaft after the cut: z = 10 + sqrt(91) = 19.5394 (bbox z, 4 decimals as inspect rounds).
+# V = pi*10^2*50 - 17.087441*50 = 14853.591
+doc.parameter {"name": "Lh", "expression": 50}
+doc.parameter {"name": "kw", "expression": 6}
+solid.cylinder {"base": [0, 0, 0], "axis": [1, 0, 0], "diameter": 20, "height": "Lh"}
+solid.box {"corner": [-1, "-kw/2", 7], "size": ["Lh+2", "kw", 5], "operation": "cut", "target": "Body1"}
