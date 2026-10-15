@@ -9,7 +9,10 @@
 )]
 
 mod builtin;
+mod modeling;
+pub mod params;
 mod registry;
+pub mod selection;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
@@ -17,8 +20,11 @@ use std::sync::Arc;
 use serde::Serialize;
 use serde_json::Value;
 
+pub use formcraft_doc as doc;
 pub use formcraft_kernel as kernel;
+pub use formcraft_regen as regen;
 pub use registry::{Command, CommandSpec, Handler, Placement, Registry, Source, valid_id};
+pub use selection::{Pick, Selection};
 
 pub type Result<T> = std::result::Result<T, EngineError>;
 
@@ -42,6 +48,18 @@ impl From<kernel::KernelError> for EngineError {
     }
 }
 
+impl From<doc::DocError> for EngineError {
+    fn from(e: doc::DocError) -> Self {
+        EngineError::InvalidParams(e.to_string())
+    }
+}
+
+impl From<formcraft_io::IoError> for EngineError {
+    fn from(e: formcraft_io::IoError) -> Self {
+        EngineError::Failed(e.to_string())
+    }
+}
+
 /// One line of the Text Commands log.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct LogEntry {
@@ -51,15 +69,23 @@ pub struct LogEntry {
     pub message: String,
 }
 
-/// An editing session: kernel, command registry, log. (Document, selection and undo arrive in
-/// Phases 2–3.)
+/// An editing session: kernel, command registry, the document with its undo history, the
+/// regenerated model and the selection.
 pub struct Session {
     kernel: Arc<dyn kernel::Kernel>,
     registry: Registry,
     log: Vec<LogEntry>,
+    doc: Arc<doc::Document>,
+    undo: Vec<(String, Arc<doc::Document>)>,
+    redo: Vec<(String, Arc<doc::Document>)>,
+    model: regen::Model,
+    selection: Selection,
+    /// Bumped on every document change (views re-tessellate when it changes).
+    revision: u64,
 }
 
 const LOG_LIMIT: usize = 1000;
+const UNDO_LIMIT: usize = 200;
 
 impl Session {
     /// Session on the OpenCascade kernel with the built-in commands.
@@ -68,9 +94,109 @@ impl Session {
     }
 
     pub fn with_kernel(kernel: Arc<dyn kernel::Kernel>) -> Self {
-        let mut s = Session { kernel, registry: Registry::default(), log: Vec::new() };
+        let mut s = Session {
+            kernel,
+            registry: Registry::default(),
+            log: Vec::new(),
+            doc: Arc::new(doc::Document::default()),
+            undo: Vec::new(),
+            redo: Vec::new(),
+            model: regen::Model::default(),
+            selection: Selection::default(),
+            revision: 0,
+        };
         builtin::register(&mut s.registry);
+        modeling::register(&mut s.registry);
         s
+    }
+
+    pub fn document(&self) -> &doc::Document {
+        &self.doc
+    }
+
+    pub fn model(&self) -> &regen::Model {
+        &self.model
+    }
+
+    pub fn revision(&self) -> u64 {
+        self.revision
+    }
+
+    pub fn selection(&self) -> &Selection {
+        &self.selection
+    }
+
+    pub fn selection_mut(&mut self) -> &mut Selection {
+        &mut self.selection
+    }
+
+    pub fn can_undo(&self) -> bool {
+        !self.undo.is_empty()
+    }
+
+    pub fn can_redo(&self) -> bool {
+        !self.redo.is_empty()
+    }
+
+    /// Label of the step that undo would revert.
+    pub fn undo_label(&self) -> Option<&str> {
+        self.undo.last().map(|(l, _)| l.as_str())
+    }
+
+    /// Replace the document (new / open) and clear history.
+    pub fn load(&mut self, d: doc::Document) {
+        self.doc = Arc::new(d);
+        self.undo.clear();
+        self.redo.clear();
+        self.selection.clear();
+        self.regenerate();
+    }
+
+    fn regenerate(&mut self) {
+        self.model = regen::regen(&self.doc, self.kernel.as_ref());
+        self.selection.retain_bodies(&self.model);
+        self.revision = self.revision.wrapping_add(1);
+    }
+
+    /// One undoable edit: the closure works on a copy of the document; the copy replaces the
+    /// document only if the closure succeeds. `check` may inspect the regenerated model and
+    /// refuse the edit (it is then rolled back).
+    pub fn edit<T>(
+        &mut self,
+        label: &str,
+        f: impl FnOnce(&mut doc::Document) -> Result<T>,
+        check: impl FnOnce(&T, &regen::Model) -> Result<()>,
+    ) -> Result<T> {
+        let mut next = (*self.doc).clone();
+        let out = f(&mut next)?;
+        let model = regen::regen(&next, self.kernel.as_ref());
+        check(&out, &model)?;
+        let prev = std::mem::replace(&mut self.doc, Arc::new(next));
+        self.undo.push((label.to_string(), prev));
+        if self.undo.len() > UNDO_LIMIT {
+            self.undo.remove(0);
+        }
+        self.redo.clear();
+        self.model = model;
+        self.selection.retain_bodies(&self.model);
+        self.revision = self.revision.wrapping_add(1);
+        Ok(out)
+    }
+
+    pub fn undo(&mut self) -> Result<String> {
+        let (label, prev) = self.undo.pop().ok_or_else(|| EngineError::Failed("nothing to undo".into()))?;
+        let cur = std::mem::replace(&mut self.doc, prev);
+        self.redo.push((label.clone(), cur));
+        self.regenerate();
+        Ok(label)
+    }
+
+    pub fn redo(&mut self) -> Result<String> {
+        let (label, next) = self.redo.pop().ok_or_else(|| EngineError::Failed("nothing to redo".into()))?;
+        let cur = std::mem::replace(&mut self.doc, next);
+        self.undo.push((label.clone(), cur));
+        self.regenerate();
+        Ok(label)
     }
 
     pub fn kernel(&self) -> &Arc<dyn kernel::Kernel> {

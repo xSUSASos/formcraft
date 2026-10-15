@@ -11,3 +11,9 @@ workspace = true
 
 [dependencies]
 formcraft-engine = { workspace = true }
+formcraft-io = { workspace = true }
+serde_json = { workspace = true }
+
+[[test]]
+name = "acceptance"
+harness = false

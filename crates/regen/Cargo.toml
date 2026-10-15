@@ -14,5 +14,8 @@ workspace = true
 formcraft-kernel = { workspace = true }
 formcraft-sketch = { workspace = true }
 formcraft-doc = { workspace = true }
-thiserror = { workspace = true }
+serde = { workspace = true }
 log = { workspace = true }
+
+[dev-dependencies]
+formcraft-occt = { workspace = true }

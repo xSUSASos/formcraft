@@ -21,3 +21,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 glam = { workspace = true }
 image = { workspace = true }
+
+[dev-dependencies]
+egui_kittest = { workspace = true }

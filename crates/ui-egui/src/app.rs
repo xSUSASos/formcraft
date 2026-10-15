@@ -75,6 +75,8 @@ pub struct FormCraftApp {
     options: AppOptions,
     frame: u64,
     screenshot_requested: bool,
+    /// Where the ViewCube was drawn last frame (tests, hit checks).
+    cube_area: Rect,
 }
 
 impl FormCraftApp {
@@ -120,6 +122,7 @@ impl FormCraftApp {
             options,
             frame: 0,
             screenshot_requested: false,
+            cube_area: Rect::NOTHING,
         };
         if let Some(v) = view {
             app.apply_named_view(&v.to_uppercase());
@@ -544,6 +547,7 @@ impl FormCraftApp {
 
         if self.layout.view_cube {
             let area = Rect::from_min_size(pos2(rect.right() - 150.0, rect.top() + 8.0), Vec2::splat(140.0));
+            self.cube_area = area;
             match viewcube::show(ui, area, &self.camera, t) {
                 Some(CubeAction::View(v)) => {
                     self.camera.look_from(v.dir());
@@ -801,3 +805,7 @@ impl eframe::App for FormCraftApp {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "app_tests.rs"]
+mod tests;

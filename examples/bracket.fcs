@@ -1,0 +1,7 @@
+# Bracket plate 60x40x5 with two M6 clearance holes (Phase 2 acceptance).
+doc.parameter {"name": "L", "expression": 60}
+doc.parameter {"name": "W", "expression": 40}
+doc.parameter {"name": "T", "expression": 5}
+solid.box {"size": ["L", "W", "T"]}
+solid.cylinder {"base": [10, "W/2", -1], "diameter": 6.6, "height": "T+2", "operation": "cut", "target": "Body1"}
+solid.cylinder {"base": ["L-10", "W/2", -1], "diameter": 6.6, "height": "T+2", "operation": "cut", "target": "Body1"}

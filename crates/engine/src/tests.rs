@@ -70,3 +70,145 @@ fn search_ranks_label_prefix_first() {
     assert_eq!(hits, vec!["solid.extrude", "solid.fillet"]);
     assert!(r.search("   ").is_empty());
 }
+
+// ---------------------------------------------------------------- Phase 2 modelling
+
+fn inspect_body(s: &mut Session, i: usize) -> Value {
+    s.execute("model.inspect", &json!({})).unwrap()["bodies"][i].clone()
+}
+
+#[test]
+fn bracket_plate_with_two_holes_and_parameters() {
+    let mut s = session();
+    s.execute("doc.parameter", &json!({"name": "L", "expression": 60})).unwrap();
+    s.execute("doc.parameter", &json!({"name": "hole_d", "expression": "6"})).unwrap();
+    let plate = s.execute("solid.box", &json!({"size": ["L", 40, 5]})).unwrap();
+    assert_eq!(plate["body_name"], "Body1");
+    for x in [10, 50] {
+        s.execute(
+            "solid.cylinder",
+            &json!({"base": [x, 20, -1], "diameter": "hole_d", "height": 7, "operation": "cut", "target": "Body1"}),
+        )
+        .unwrap();
+    }
+    let b = inspect_body(&mut s, 0);
+    let want = 60.0 * 40.0 * 5.0 - 2.0 * std::f64::consts::PI * 9.0 * 5.0;
+    assert!((b["volume"].as_f64().unwrap() - want).abs() < 1e-3, "{b}");
+    assert_eq!(b["bbox"]["size"], json!([60.0, 40.0, 5.0]));
+    assert_eq!(b["cylindrical_faces"], 2);
+
+    // Parameter change propagates.
+    s.execute("doc.parameter", &json!({"name": "L", "expression": "80"})).unwrap();
+    assert_eq!(inspect_body(&mut s, 0)["bbox"]["size"][0], 80.0);
+}
+
+#[test]
+fn failing_feature_is_refused_atomically() {
+    let mut s = session();
+    s.execute("solid.box", &json!({"size": [10, 10, 10]})).unwrap();
+    let before = s.document().features.len();
+    let e = s.execute("solid.sphere", &json!({"radius": -5})).unwrap_err();
+    assert!(e.to_string().contains("radius"), "{e}");
+    assert_eq!(s.document().features.len(), before, "nothing added");
+    assert!(s.execute("solid.box", &json!({"size": [1, 1, 1], "operation": "cut", "target": "Nope"})).is_err());
+    assert!(s.execute("solid.box", &json!({"size": [1, 1]})).is_err());
+    assert!(s.execute("solid.cylinder", &json!({"radius": 1, "diameter": 2, "height": 1})).is_err());
+    assert!(s.execute("solid.box", &json!({"size": ["unknown_param", 1, 1]})).is_err());
+}
+
+#[test]
+fn undo_redo_walks_history() {
+    let mut s = session();
+    s.execute("solid.box", &json!({"size": [10, 10, 10]})).unwrap();
+    s.execute("solid.sphere", &json!({"center": [30, 0, 0], "radius": 3})).unwrap();
+    assert_eq!(s.model().bodies.len(), 2);
+    s.execute("doc.undo", &json!({})).unwrap();
+    assert_eq!(s.model().bodies.len(), 1);
+    s.execute("doc.redo", &json!({})).unwrap();
+    assert_eq!(s.model().bodies.len(), 2);
+    s.execute("doc.undo", &json!({})).unwrap();
+    s.execute("doc.undo", &json!({})).unwrap();
+    assert!(s.execute("doc.undo", &json!({})).is_err());
+    assert_eq!(s.model().bodies.len(), 0);
+}
+
+#[test]
+fn combine_and_body_commands() {
+    let mut s = session();
+    s.execute("solid.box", &json!({"size": [10, 10, 10]})).unwrap();
+    s.execute("solid.box", &json!({"corner": [5, 5, 5], "size": [10, 10, 10]})).unwrap();
+    s.execute("solid.combine", &json!({"target": "Body1", "tool": "Body2", "operation": "cut"})).unwrap();
+    assert_eq!(s.model().bodies.len(), 1);
+    assert!((inspect_body(&mut s, 0)["volume"].as_f64().unwrap() - 875.0).abs() < 1e-6);
+    s.execute("body.rename", &json!({"body": "Body1", "name": "Bracket"})).unwrap();
+    s.execute("body.visibility", &json!({"body": "Bracket"})).unwrap();
+    assert!(!s.model().bodies[0].visible);
+    assert!(
+        s.execute("doc.export", &json!({"path": std::env::temp_dir().join("fc-none.stl").to_str().unwrap()})).is_err(),
+        "no visible bodies"
+    );
+}
+
+#[test]
+fn export_stl_has_the_right_volume() {
+    let mut s = session();
+    s.execute("solid.box", &json!({"size": [20, 10, 5]})).unwrap();
+    let path = std::env::temp_dir().join(format!("fc-export-{}.stl", std::process::id()));
+    s.execute("doc.export", &json!({"path": path.to_str().unwrap()})).unwrap();
+    let mesh = formcraft_io::stl::from_bytes(&std::fs::read(&path).unwrap()).unwrap();
+    let _ = std::fs::remove_file(&path);
+    assert!((mesh.volume() - 1000.0).abs() < 1e-3);
+    assert!(s.execute("doc.export", &json!({"path": "x.unknown"})).is_err());
+}
+
+#[test]
+fn timeline_commands() {
+    let mut s = session();
+    s.execute("solid.box", &json!({"size": [10, 10, 10]})).unwrap();
+    s.execute("solid.box", &json!({"size": [5, 5, 5], "operation": "cut", "target": "Body1"})).unwrap();
+    s.execute("timeline.marker", &json!({"index": 1})).unwrap();
+    assert!((inspect_body(&mut s, 0)["volume"].as_f64().unwrap() - 1000.0).abs() < 1e-6);
+    s.execute("timeline.marker", &json!({"index": null})).unwrap();
+    s.execute("feature.suppress", &json!({"feature": "Box2"})).unwrap();
+    assert!((inspect_body(&mut s, 0)["volume"].as_f64().unwrap() - 1000.0).abs() < 1e-6);
+    s.execute("feature.rename", &json!({"feature": "Box2", "name": "Pocket"})).unwrap();
+    s.execute("feature.delete", &json!({"feature": "Pocket"})).unwrap();
+    assert_eq!(s.document().features.len(), 1);
+    let insp = s.execute("model.inspect", &json!({})).unwrap();
+    assert_eq!(insp["features"][0]["status"], "ok");
+}
+
+#[test]
+fn selection_commands() {
+    let mut s = session();
+    s.execute("solid.box", &json!({"size": [1, 1, 1]})).unwrap();
+    s.execute("select.set", &json!({"picks": [{"type": "face", "body": 1, "index": 0}]})).unwrap();
+    assert_eq!(s.selection().items.len(), 1);
+    assert!(s.execute("select.set", &json!({"picks": [{"type": "body", "body": 77}]})).is_err());
+    assert!(s.execute("select.set", &json!({"picks": "garbage"})).is_err());
+    s.execute("select.clear", &json!({})).unwrap();
+    assert!(s.selection().items.is_empty());
+}
+
+/// Every command with garbage params returns an error or a value, never panics.
+#[test]
+fn hostile_params_never_panic() {
+    let mut s = session();
+    s.execute("solid.box", &json!({"size": [1, 1, 1]})).unwrap();
+    let ids: Vec<String> = s.registry().specs().map(|c| c.id.clone()).collect();
+    let junk = [
+        json!({}),
+        json!({"size": "x", "radius": [], "path": 5, "name": {}, "feature": -1, "index": -3, "body": 1e300}),
+        json!({"size": [1e308, 1e308, 1e308], "radius": "1/0", "expression": "(((("}),
+        json!({"picks": [{"type": "edge", "body": 1, "index": 4000000000u64}], "tools": [1, 1, 1]}),
+    ];
+    for id in &ids {
+        if id == "doc.new" {
+            continue;
+        }
+        for j in &junk {
+            let r = s.execute(id, j);
+            assert!(!matches!(r, Err(EngineError::Internal(..))), "{id} panicked with {j}");
+        }
+    }
+}
