@@ -13,5 +13,6 @@ workspace = true
 [dependencies]
 formcraft-engine = { workspace = true }
 formcraft-render = { workspace = true }
+formcraft-kernel = { workspace = true }
 serde_json = { workspace = true }
 log = { workspace = true }

@@ -1,0 +1,148 @@
+//! JSON-RPC 2.0 framing and the MCP lifecycle, tools and resources.
+
+use std::io::{BufRead, Write};
+
+use serde_json::{Value, json};
+
+use crate::backend::Backend;
+use crate::tools;
+
+pub const PROTOCOL_VERSION: &str = "2025-06-18";
+const SUPPORTED: &[&str] = &[PROTOCOL_VERSION, "2025-03-26", "2024-11-05"];
+
+const PARSE_ERROR: i64 = -32700;
+const INVALID_REQUEST: i64 = -32600;
+const METHOD_NOT_FOUND: i64 = -32601;
+const INVALID_PARAMS: i64 = -32602;
+/// Lines longer than this are refused (hostile input).
+const MAX_LINE: usize = 64 * 1024 * 1024;
+
+const INSTRUCTIONS: &str = "FormCraft is a parametric 3D CAD (Fusion 360 style). Units: mm and degrees, Z is up. \
+Build parts as a timeline of features with `execute`: e.g. doc.parameter {name, expression}, \
+sketch.create {plane: \"XY\", rectangles: [{corner: [0,0], size: [\"L\", 40]}], circles: [...]}, \
+solid.extrude {distance}, solid.hole {points, diameter}, solid.fillet {edges: \"vertical\", radius}. \
+Numbers may be expressions with parameters. list_commands shows every command with its JSON schema; \
+list_selectors explains face/edge selectors. Verify with inspect_model (exact volume, bbox, faces) and look with render.";
+
+pub struct Server {
+    backend: Box<dyn Backend>,
+    initialized: bool,
+}
+
+fn response(id: Value, result: Value) -> Value {
+    json!({"jsonrpc": "2.0", "id": id, "result": result})
+}
+
+fn error(id: Value, code: i64, message: impl Into<String>) -> Value {
+    json!({"jsonrpc": "2.0", "id": id, "error": {"code": code, "message": message.into()}})
+}
+
+impl Server {
+    pub fn new(backend: Box<dyn Backend>) -> Self {
+        Server { backend, initialized: false }
+    }
+
+    pub fn is_initialized(&self) -> bool {
+        self.initialized
+    }
+
+    /// Serve newline-delimited JSON-RPC until `input` closes. Logs go to stderr only (stdout is
+    /// the protocol).
+    pub fn serve(&mut self, input: impl BufRead, mut output: impl Write) -> std::io::Result<()> {
+        for line in input.lines() {
+            let line = line?;
+            if let Some(reply) = self.handle_line(&line) {
+                output.write_all(reply.as_bytes())?;
+                output.write_all(b"\n")?;
+                output.flush()?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn handle_line(&mut self, line: &str) -> Option<String> {
+        let line = line.trim();
+        if line.is_empty() {
+            return None;
+        }
+        if line.len() > MAX_LINE {
+            return Some(error(Value::Null, INVALID_REQUEST, "message too large").to_string());
+        }
+        let reply = match serde_json::from_str::<Value>(line) {
+            Ok(Value::Array(batch)) if batch.is_empty() => Some(error(Value::Null, INVALID_REQUEST, "empty batch")),
+            Ok(Value::Array(batch)) => {
+                let replies: Vec<Value> = batch.into_iter().filter_map(|m| self.handle(m)).collect();
+                (!replies.is_empty()).then_some(Value::Array(replies))
+            }
+            Ok(msg) => self.handle(msg),
+            Err(e) => Some(error(Value::Null, PARSE_ERROR, format!("parse error: {e}"))),
+        };
+        reply.map(|r| r.to_string())
+    }
+
+    pub fn handle(&mut self, msg: Value) -> Option<Value> {
+        let Value::Object(o) = &msg else {
+            return Some(error(Value::Null, INVALID_REQUEST, "message must be an object"));
+        };
+        let id = o.get("id").cloned();
+        let Some(method) = o.get("method").and_then(Value::as_str) else {
+            if o.contains_key("result") || o.contains_key("error") {
+                return None; // a response to us; we never send requests
+            }
+            return Some(error(id.unwrap_or(Value::Null), INVALID_REQUEST, "missing `method`"));
+        };
+        let params = o.get("params").cloned().unwrap_or(Value::Null);
+        let Some(id) = id else {
+            if method == "notifications/initialized" {
+                self.initialized = true;
+            }
+            return None;
+        };
+        Some(match self.request(method, &params) {
+            Ok(r) => response(id, r),
+            Err((code, m)) => error(id, code, m),
+        })
+    }
+
+    fn request(&mut self, method: &str, params: &Value) -> Result<Value, (i64, String)> {
+        match method {
+            "initialize" => {
+                let asked = params.get("protocolVersion").and_then(Value::as_str).unwrap_or(PROTOCOL_VERSION);
+                let version = if SUPPORTED.contains(&asked) { asked } else { PROTOCOL_VERSION };
+                Ok(json!({
+                    "protocolVersion": version,
+                    "capabilities": {"tools": {"listChanged": false}, "resources": {"listChanged": false}},
+                    "serverInfo": {"name": "formcraft", "title": "FormCraft", "version": env!("CARGO_PKG_VERSION")},
+                    "instructions": format!("{INSTRUCTIONS} Backend: {}.", self.backend.describe()),
+                }))
+            }
+            "ping" => Ok(json!({})),
+            "tools/list" => Ok(tools::definitions(self.backend.has_ui())),
+            "tools/call" => {
+                let name = params
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .ok_or((INVALID_PARAMS, "missing tool `name`".to_string()))?;
+                let args = params.get("arguments").cloned().unwrap_or(Value::Null);
+                tools::call(self.backend.as_mut(), name, args).map_err(|m| (INVALID_PARAMS, m))
+            }
+            "resources/list" => Ok(json!({"resources": [
+                {"uri": "formcraft://model", "name": "Current model", "mimeType": "application/json"},
+                {"uri": "formcraft://commands", "name": "Command catalog", "mimeType": "application/json"},
+                {"uri": "formcraft://selectors", "name": "Face and edge selectors", "mimeType": "application/json"},
+            ]})),
+            "resources/read" => {
+                let uri = params.get("uri").and_then(Value::as_str).unwrap_or("");
+                let v = match uri {
+                    "formcraft://model" => self.backend.call("model.inspect", json!({})),
+                    "formcraft://commands" => self.backend.call("engine.commands", json!({})),
+                    "formcraft://selectors" => self.backend.call("selectors.list", json!({})),
+                    _ => return Err((-32002, format!("unknown resource `{uri}`"))),
+                }
+                .map_err(|e| (-32603, e))?;
+                Ok(json!({"contents": [{"uri": uri, "mimeType": "application/json", "text": v.to_string()}]}))
+            }
+            _ => Err((METHOD_NOT_FOUND, format!("method `{method}` not found"))),
+        }
+    }
+}

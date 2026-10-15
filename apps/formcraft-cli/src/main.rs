@@ -3,7 +3,10 @@
 //! ```text
 //! formcraft-cli run <script|-> [--save out.step|out.stl] [--quiet]
 //! formcraft-cli commands [filter]
-//! formcraft-cli info <file.step>
+//! formcraft-cli info <file.step|file.fcraft>
+//! formcraft-cli convert <in.step|in.fcraft> <out.step|out.stl>
+//! formcraft-cli render <in.fcraft|script.fcs|in.step> <out.png> [--view iso|top|front|…] [--size WxH]
+//! formcraft-cli mcp [--port N]
 //! ```
 //!
 //! A script is either a JSON array of `{"command": id, "params": {...}}` objects or text with
@@ -20,7 +23,10 @@ const USAGE: &str = "\
 usage:
   formcraft-cli run <script|-> [--save <out.step|out.stl>] [--quiet]
   formcraft-cli commands [filter]
-  formcraft-cli info <file.step>
+  formcraft-cli info <file.step|file.fcraft>
+  formcraft-cli convert <in.step|in.fcraft|script.fcs> <out.step|out.stl>
+  formcraft-cli render <in.fcraft|script.fcs|in.step> <out.png> [--view iso|top|front|right|…] [--size WxH]
+  formcraft-cli mcp [--port N]     MCP server on stdio (headless, or attached to `formcraft --control N`)
 
 A script is a JSON array of {\"command\": id, \"params\": {...}} or one command per line:
   solid.box {\"size\": [60, 40, 5]}
@@ -38,6 +44,12 @@ fn main() -> ExitCode {
             Some(p) => info(Path::new(p)),
             None => Err("info needs a file".into()),
         },
+        Some("convert") => match (args.get(1), args.get(2)) {
+            (Some(a), Some(b)) => convert(Path::new(a), Path::new(b)),
+            _ => Err("convert needs <input> <output>".into()),
+        },
+        Some("render") => render(&args[1..]),
+        Some("mcp") => mcp(&args[1..]),
         Some("-h" | "--help" | "help") | None => {
             print!("{USAGE}");
             Ok(())
@@ -107,7 +119,98 @@ fn commands(filter: Option<&str>) -> Result<(), String> {
     Ok(())
 }
 
+/// A session loaded from a .fcraft design, a command script or a STEP file (bodies as
+/// imported features would need Phase 7; STEP is handled by the callers directly).
+fn load(path: &Path) -> Result<Session, String> {
+    let mut s = Session::new();
+    match path.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref() {
+        Some("fcraft") => {
+            s.execute("doc.open", &json!({"path": path.to_string_lossy()})).map_err(|e| e.to_string())?;
+        }
+        Some("fcs") | Some("txt") | Some("json") => {
+            let steps = parse_script(&read_script(&path.to_string_lossy())?)?;
+            formcraft_engine::script::run(&mut s, &steps).map_err(|(i, e)| format!("step {}: {e}", i + 1))?;
+        }
+        _ => return Err(format!("{}: expected .fcraft or a .fcs script", path.display())),
+    }
+    Ok(s)
+}
+
+fn is_step(p: &Path) -> bool {
+    matches!(p.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref(), Some("step" | "stp"))
+}
+
+fn shapes_of(path: &Path) -> Result<(Session, Vec<formcraft_kernel::Shape>), String> {
+    if is_step(path) {
+        let s = Session::new();
+        let solids = formcraft_io::import_step(s.kernel().as_ref(), path).map_err(|e| e.to_string())?;
+        Ok((s, solids))
+    } else {
+        let s = load(path)?;
+        let shapes = s.model().bodies.iter().filter(|b| b.visible).map(|b| b.shape.clone()).collect();
+        Ok((s, shapes))
+    }
+}
+
+fn convert(input: &Path, output: &Path) -> Result<(), String> {
+    let (s, shapes) = shapes_of(input)?;
+    formcraft_io::export(s.kernel().as_ref(), &shapes, output).map_err(|e| e.to_string())?;
+    eprintln!("{} body(ies) → {}", shapes.len(), output.display());
+    Ok(())
+}
+
+fn render(args: &[String]) -> Result<(), String> {
+    let (Some(input), Some(out)) = (args.first(), args.get(1)) else {
+        return Err("render needs <input> <out.png>".into());
+    };
+    let mut p = json!({});
+    let mut it = args.iter().skip(2);
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "--view" => p["view"] = json!(it.next().ok_or("--view needs a name")?),
+            "--size" => {
+                let v = it.next().ok_or("--size needs WxH")?;
+                let (w, h) = v.split_once('x').ok_or("--size needs WxH")?;
+                p["width"] = json!(w.parse::<u32>().map_err(|e| e.to_string())?);
+                p["height"] = json!(h.parse::<u32>().map_err(|e| e.to_string())?);
+            }
+            "--no-grid" => p["grid"] = json!(false),
+            "--no-edges" => p["edges"] = json!(false),
+            other => return Err(format!("unexpected argument `{other}`")),
+        }
+    }
+    let (s, shapes) = shapes_of(Path::new(input))?;
+    let o = formcraft_mcp::backend::render_options(&p)?;
+    let bodies: Vec<(u64, formcraft_kernel::Shape)> =
+        shapes.into_iter().enumerate().map(|(i, sh)| (i as u64 + 1, sh)).collect();
+    let mut r = formcraft_render::gpu::Renderer::headless().map_err(|e| e.to_string())?;
+    let png = formcraft_render::headless::render_png(&mut r, s.kernel().as_ref(), &bodies, &o)?;
+    std::fs::write(out, png).map_err(|e| format!("{out}: {e}"))?;
+    eprintln!("rendered {} body(ies) → {out}", bodies.len());
+    Ok(())
+}
+
+fn mcp(args: &[String]) -> Result<(), String> {
+    let backend: Box<dyn formcraft_mcp::Backend> = match args.iter().position(|a| a == "--port") {
+        Some(i) => {
+            let port: u16 =
+                args.get(i + 1).ok_or("--port needs a number")?.parse().map_err(|e| format!("--port: {e}"))?;
+            Box::new(formcraft_mcp::Remote::connect(port)?)
+        }
+        None => Box::new(formcraft_mcp::Headless::new()),
+    };
+    let mut server = formcraft_mcp::Server::new(backend);
+    let stdin = std::io::stdin();
+    server.serve(stdin.lock(), std::io::stdout().lock()).map_err(|e| e.to_string())
+}
+
 fn info(path: &Path) -> Result<(), String> {
+    if !is_step(path) {
+        let mut s = load(path)?;
+        let v = s.execute("model.inspect", &json!({})).map_err(|e| e.to_string())?;
+        println!("{}", serde_json::to_string_pretty(&v).unwrap_or_default());
+        return Ok(());
+    }
     let s = Session::new();
     let k = s.kernel();
     let solids = formcraft_io::import_step(k.as_ref(), path).map_err(|e| e.to_string())?;

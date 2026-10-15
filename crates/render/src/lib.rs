@@ -11,6 +11,7 @@
 pub mod camera;
 pub mod gpu;
 pub mod grid;
+pub mod headless;
 pub mod pick;
 pub mod scene;
 

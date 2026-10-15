@@ -4,7 +4,9 @@
 > Сессии иногда обрываются: PROGRESS.md обновлять после каждого шага, сборки > 10 мин — фоном.
 
 ## Сейчас
-- **Фаза:** 4 — Команды, CLI, MCP (начинается). Фаза 3 закрыта (приёмка ниже), ждёт learn-док от Sonnet → тег phase-3.
+- **Фаза:** 4 — Команды, CLI, MCP (в работе). Фаза 3 закрыта, тег phase-3.
+- **Сделано в фазе 4:** шаги 1–3 — `render::headless` (PNG), CLI `convert`/`render`/`mcp [--port N]`, крейт `mcp` (stdio JSON-RPC, инструменты execute/list_commands/inspect_model/render/list_selectors/run_script/new_design; screenshot/ui_click для Remote). Тесты mcp 5/5, CI зелёный.
+- **Следующий шаг:** 4 — control channel в приложении (`formcraft --control PORT`: engine.execute, model.inspect, ui.render, ui.screenshot, ui.click; бэкенд Remote уже ждёт этот протокол в `crates/mcp/src/backend.rs`), затем 5–7.
 - **План фазы 4:**
   1. `render::headless`: PNG тел (headless wgpu) — для `formcraft-cli render` и MCP `render`.
   2. CLI: `convert` (STEP→STL/STEP), `render`, `mcp`.
@@ -28,8 +30,8 @@
 | 0 Окружение и ядро | готово | phase-0 |
 | 1 Каркас и оболочка UI | готово | phase-1 |
 | 2 Тело на экране | готово | phase-2 |
-| 3 Эскиз, фичи, таймлайн | готово (ждёт learn-док) | — |
-| 4 Команды, CLI, MCP | — | — |
+| 3 Эскиз, фичи, таймлайн | готово | phase-3 |
+| 4 Команды, CLI, MCP | в работе (шаги 1–3) | — |
 | 5 Встроенный ИИ | — | — |
 | 6 Плагины и скрипты | — | — |
 | 7 Шлифовка и релиз | — | — |
@@ -79,4 +81,4 @@
 - 20 иконок тулбара в `crates/ui-egui/src/icons.rs` — проверено: clippy/CI зелёные, на скриншоте выглядят корректно.
 - `docs/learn/phase-1.md`, `docs/learn/phase-2.md` — проверены (структура, ключевые факты), без правок.
 - 10 golden-деталей (`examples/golden`, `crates/engine/tests/golden.rs`) — проверено: все зелёные, выборочно пересчитан фланец.
-- `docs/shortcuts.md`, `docs/learn/phase-3.md` — в работе.
+- `docs/shortcuts.md`, `docs/learn/phase-3.md` — проверены, закоммичены.
