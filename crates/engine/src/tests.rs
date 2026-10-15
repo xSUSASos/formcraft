@@ -324,3 +324,76 @@ fn save_and_open_round_trip() {
     let _ = std::fs::remove_file(&saved);
     assert!(t.execute("doc.open", &json!({"path": "nope.fcraft"})).is_err());
 }
+
+#[test]
+fn edit_feature_and_preview() {
+    let mut s = session();
+    s.execute("sketch.create", &json!({"rectangles": [{"corner": [0, 0], "size": [30, 20]}]})).unwrap();
+    let ex = s.execute("solid.extrude", &json!({"distance": 5})).unwrap();
+    s.execute("solid.fillet", &json!({"edges": "vertical", "radius": 2})).unwrap();
+    let id = ex["feature"].as_u64().unwrap();
+    let p = s.execute("feature.params", &json!({"feature": id})).unwrap();
+    assert_eq!(p["command"], "solid.extrude");
+    assert_eq!(p["params"]["distance"], "5");
+    // preview does not touch the document
+    let m = s.preview("feature.edit", &json!({"feature": id, "params": {"distance": 12}})).unwrap();
+    assert_eq!(m.error_count(), 0);
+    assert!((inspect_body(&mut s, 0)["bbox"]["size"][2].as_f64().unwrap() - 5.0).abs() < 1e-9);
+    s.execute("feature.edit", &json!({"feature": id, "params": {"distance": 12}})).unwrap();
+    assert!((inspect_body(&mut s, 0)["bbox"]["size"][2].as_f64().unwrap() - 12.0).abs() < 1e-9);
+    assert_eq!(s.model().error_count(), 0, "the fillet downstream still works");
+    assert_eq!(s.document().features.len(), 3);
+    s.execute("doc.undo", &json!({})).unwrap();
+    assert!((inspect_body(&mut s, 0)["bbox"]["size"][2].as_f64().unwrap() - 5.0).abs() < 1e-9);
+    assert!(s.execute("feature.edit", &json!({"feature": id, "params": {"distance": 0}})).is_err());
+    assert!(s.execute("feature.edit", &json!({"feature": "Sketch1", "params": {}})).is_err());
+}
+
+#[test]
+fn interactive_sketch_editing() {
+    let mut s = session();
+    let sk = s.execute("sketch.create", &json!({"plane": "XY"})).unwrap();
+    let id = sk["feature"].as_u64().unwrap();
+    let r = s
+        .execute(
+            "sketch.edit",
+            &json!({"sketch": id, "ops": [
+                {"op": "line", "a": [0, 0], "b": [40, 0]},
+            ]}),
+        )
+        .unwrap();
+    let ids: Vec<u64> = r["created"][0].as_array().unwrap().iter().map(|v| v.as_u64().unwrap()).collect();
+    let (p0, p1, l0) = (ids[0], ids[1], ids[2]);
+    // continue the chain from the last point, close the triangle on the first
+    let r = s
+        .execute(
+            "sketch.edit",
+            &json!({"sketch": id, "ops": [
+                {"op": "line", "a_point": p1, "b": [20, 30]},
+            ]}),
+        )
+        .unwrap();
+    let p2 = r["created"][0][1].as_u64().unwrap();
+    s.execute(
+        "sketch.edit",
+        &json!({"sketch": id, "ops": [
+            {"op": "line", "a_point": p2, "b_point": p0},
+            {"op": "constraint", "constraint": {"type": "horizontal", "line": l0}},
+            {"op": "dimension", "dimension": {"type": "length", "line": l0}, "value": 50},
+        ]}),
+    )
+    .unwrap();
+    let g = s.execute("sketch.get", &json!({"sketch": id})).unwrap();
+    assert_eq!(g["regions"].as_array().unwrap().len(), 1, "{g}");
+    let area = g["regions"][0]["area"].as_f64().unwrap();
+    assert!(area > 600.0, "triangle grew with the 50 mm base: {area}");
+    s.execute("solid.extrude", &json!({"distance": 3})).unwrap();
+    // over-constrain → refused, nothing changes
+    let before = s.document().clone();
+    assert!(s.execute("sketch.edit", &json!({"sketch": id, "ops": [{"op": "dimension", "dimension": {"type": "distance", "a": p0, "b": p1}, "value": 70}]})).is_err());
+    assert_eq!(s.document(), &before);
+    assert!(s.execute("sketch.edit", &json!({"sketch": id, "ops": [{"op": "fly"}]})).is_err());
+    assert!(
+        s.execute("sketch.edit", &json!({"sketch": id, "ops": [{"op": "move", "point": 9999, "to": [0, 0]}]})).is_err()
+    );
+}

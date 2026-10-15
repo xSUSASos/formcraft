@@ -9,12 +9,14 @@
 )]
 
 mod builtin;
+pub mod edit;
 mod features3;
 mod modeling;
 pub mod params;
 mod registry;
 pub mod script;
 pub mod selection;
+mod sketch_edit;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
@@ -116,6 +118,8 @@ impl Session {
         builtin::register(&mut s.registry);
         modeling::register(&mut s.registry);
         features3::register(&mut s.registry);
+        edit::register(&mut s.registry);
+        sketch_edit::register(&mut s.registry);
         s
     }
 
