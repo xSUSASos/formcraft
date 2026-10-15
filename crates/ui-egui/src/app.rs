@@ -7,7 +7,8 @@
 use std::path::PathBuf;
 
 use egui::{Align2, Color32, FontId, Id, Panel, Pos2, Rect, Sense, Stroke, Ui, Vec2, pos2};
-use formcraft_engine::Session;
+use formcraft_engine::doc::BodyId;
+use formcraft_engine::{Pick, Session};
 use formcraft_render::camera::{Camera, Projection};
 use formcraft_render::grid::{self, LineKind};
 use glam::{DVec2, DVec3};
@@ -18,6 +19,7 @@ use crate::layout::{Dock, Layout, VisualStyle};
 use crate::theme::{ThemeKind, Tokens};
 use crate::toolbar::{self, Action};
 use crate::viewcube::{self, CubeAction};
+use crate::viewport::Viewport;
 
 const LAYOUT_KEY: &str = "formcraft.layout";
 const CAMERA_KEY: &str = "formcraft.camera";
@@ -37,6 +39,8 @@ pub struct AppOptions {
     pub text_commands: bool,
     /// Start with a named view: top, front, right, home.
     pub view: Option<String>,
+    /// Run a command script at startup (demos, screenshots).
+    pub script: Option<PathBuf>,
 }
 
 /// Browser tree visibility toggles (Origin and bodies get real items in Phase 2).
@@ -77,6 +81,7 @@ pub struct FormCraftApp {
     screenshot_requested: bool,
     /// Where the ViewCube was drawn last frame (tests, hit checks).
     cube_area: Rect,
+    viewport: Viewport,
 }
 
 impl FormCraftApp {
@@ -97,7 +102,9 @@ impl FormCraftApp {
         if let Some(t) = options.theme {
             layout.theme = t;
         }
-        Self::with_state(layout, camera, options)
+        let mut app = Self::with_state(layout, camera, options);
+        app.viewport = Viewport::new(cc.wgpu_render_state.clone());
+        app
     }
 
     /// App without eframe storage (tests and headless use).
@@ -123,11 +130,43 @@ impl FormCraftApp {
             frame: 0,
             screenshot_requested: false,
             cube_area: Rect::NOTHING,
+            viewport: Viewport::new(None),
         };
+        if let Some(path) = app.options.script.clone() {
+            app.run_script_file(&path);
+            if view.is_none() {
+                app.fit();
+            }
+        }
         if let Some(v) = view {
             app.apply_named_view(&v.to_uppercase());
+            app.fit_keep_direction();
         }
         app
+    }
+
+    fn run_script_file(&mut self, path: &std::path::Path) {
+        let text = match std::fs::read_to_string(path) {
+            Ok(t) => t,
+            Err(e) => {
+                self.status = format!("{}: {e}", path.display());
+                return;
+            }
+        };
+        self.status = match formcraft_engine::script::parse(&text)
+            .map_err(|e| (0, e))
+            .and_then(|steps| formcraft_engine::script::run(&mut self.session, &steps))
+        {
+            Ok(r) => format!("Script: {} steps", r.len()),
+            Err((i, e)) => format!("Script step {}: {e}", i + 1),
+        };
+    }
+
+    /// Fit without changing the view direction (used after a named view at startup).
+    fn fit_keep_direction(&mut self) {
+        if !self.session.model().bodies.is_empty() {
+            self.fit();
+        }
     }
 
     pub fn session(&mut self) -> &mut Session {
@@ -307,7 +346,31 @@ impl FormCraftApp {
                     ui.label(egui::RichText::new("(none)").color(t.text_dim));
                 });
                 egui::CollapsingHeader::new("Bodies").default_open(true).show(ui, |ui| {
-                    ui.label(egui::RichText::new("(none)").color(t.text_dim));
+                    let bodies: Vec<(BodyId, String, bool)> =
+                        self.session.model().bodies.iter().map(|b| (b.id, b.name.clone(), b.visible)).collect();
+                    if bodies.is_empty() {
+                        ui.label(egui::RichText::new("(none)").color(t.text_dim));
+                    }
+                    for (id, name, visible) in bodies {
+                        ui.horizontal(|ui| {
+                            let mut v = visible;
+                            eye_toggle(ui, t, &mut v);
+                            if v != visible {
+                                self.run("body.visibility", serde_json::json!({"body": id.0, "visible": v}));
+                            }
+                            let pick = Pick::Body { body: id };
+                            let selected = self.session.selection().contains(&pick);
+                            let r = ui.selectable_label(selected, &name);
+                            if r.clicked() {
+                                let multi = ui.input(|i| i.modifiers.ctrl || i.modifiers.shift);
+                                let sel = self.session.selection_mut();
+                                if multi { sel.toggle(pick) } else { sel.set(pick) }
+                            }
+                            if r.hovered() {
+                                self.session.selection_mut().hover = Some(pick);
+                            }
+                        });
+                    }
                 });
             });
         });
@@ -518,10 +581,15 @@ impl FormCraftApp {
 
         self.navigate(ui, &resp, rect, size);
 
-        // Grid and axes.
+        // Bodies, grid and axes on the GPU (with depth); without a GPU (tests) the grid is
+        // painted in 2D below.
+        let gpu =
+            self.viewport.paint(ui, rect, &self.session, &self.camera, t, self.layout.grid, self.layout.visual_style);
+        self.handle_picking(ui, &resp, rect, size);
+
         let origin = rect.min.to_vec2();
         let to_pos = |p: DVec2| Pos2::new(p.x as f32, p.y as f32) + origin;
-        if self.layout.grid {
+        if !gpu && self.layout.grid {
             for (a, b, kind) in grid::lines(&self.camera) {
                 let (color, w) = match kind {
                     LineKind::Minor => (t.grid_minor, 1.0),
@@ -536,7 +604,7 @@ impl FormCraftApp {
         }
         if self.browser.origin_visible {
             let len = grid::spacing(&self.camera) * 10.0;
-            if let Some((p, q)) = grid::project_segment(&self.camera, DVec3::ZERO, DVec3::Z * len, size) {
+            if !gpu && let Some((p, q)) = grid::project_segment(&self.camera, DVec3::ZERO, DVec3::Z * len, size) {
                 painter.line_segment([to_pos(p), to_pos(q)], Stroke::new(1.5, t.axis_z));
             }
             if let Some(o) = self.camera.project(DVec3::ZERO, size) {
@@ -569,6 +637,46 @@ impl FormCraftApp {
             FontId::proportional(12.0),
             t.text_dim,
         );
+    }
+
+    /// Hover pre-selection and click selection on the canvas (Ctrl/Shift adds/removes).
+    fn handle_picking(&mut self, ui: &Ui, resp: &egui::Response, rect: Rect, size: DVec2) {
+        let dragging = ui.input(|i| i.pointer.any_down());
+        let at = resp.hover_pos().map(|h| DVec2::new((h.x - rect.left()) as f64, (h.y - rect.top()) as f64));
+        let hit = match at {
+            Some(px) if !dragging || resp.clicked() => self.viewport.pick(&self.camera, px, size, &self.session),
+            _ => None,
+        };
+        if !dragging {
+            self.session.selection_mut().hover = hit;
+        }
+        if resp.clicked() && self.nav == NavMode::Select {
+            let multi = ui.input(|i| i.modifiers.ctrl || i.modifiers.shift);
+            let sel = self.session.selection_mut();
+            match hit {
+                Some(p) if multi => sel.toggle(p),
+                Some(p) => sel.set(p),
+                None if !multi => sel.clear(),
+                None => {}
+            }
+            self.status = self.selection_summary();
+        }
+    }
+
+    fn selection_summary(&self) -> String {
+        let items = &self.session.selection().items;
+        match items.as_slice() {
+            [] => "Ready".into(),
+            [one] => {
+                let body = self.session.document().body_name(one.body());
+                match one {
+                    Pick::Body { .. } => format!("Selected: {body}"),
+                    Pick::Face { index, .. } => format!("Selected: face {index} of {body}"),
+                    Pick::Edge { index, .. } => format!("Selected: edge {index} of {body}"),
+                }
+            }
+            many => format!("{} items selected", many.len()),
+        }
     }
 
     fn paint_origin_items(&self, painter: &egui::Painter, t: &Tokens, size: DVec2, to_pos: impl Fn(DVec2) -> Pos2) {
@@ -647,9 +755,20 @@ impl FormCraftApp {
     }
 
     fn fit(&mut self) {
-        // Nothing to frame yet: fit the default work area.
         let aspect = 1.6;
-        self.camera.fit(DVec3::new(-50.0, -50.0, 0.0), DVec3::new(50.0, 50.0, 20.0), aspect);
+        let k = self.session.kernel().clone();
+        let mut bb = formcraft_kernel::Aabb::empty();
+        for b in self.session.model().bodies.iter().filter(|b| b.visible) {
+            if let Ok(m) = k.mass_props(&b.shape) {
+                bb = bb.union(&m.bbox);
+            }
+        }
+        if bb.is_empty() {
+            // Nothing to frame: the default work area.
+            self.camera.fit(DVec3::new(-50.0, -50.0, 0.0), DVec3::new(50.0, 50.0, 20.0), aspect);
+        } else {
+            self.camera.fit(bb.min, bb.max, aspect);
+        }
         self.status = "Fit".into();
     }
 

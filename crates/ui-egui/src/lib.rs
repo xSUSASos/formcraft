@@ -15,6 +15,7 @@ pub mod layout;
 pub mod theme;
 mod toolbar;
 mod viewcube;
+mod viewport;
 
 pub use app::{AppOptions, FormCraftApp};
 

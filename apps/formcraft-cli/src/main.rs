@@ -64,36 +64,7 @@ fn read_script(src: &str) -> Result<String, String> {
     Ok(s)
 }
 
-/// Parse a script into (command, params) steps.
-pub fn parse_script(text: &str) -> Result<Vec<(String, Value)>, String> {
-    let t = text.trim_start();
-    if t.starts_with('[') {
-        let v: Vec<Value> = serde_json::from_str(t).map_err(|e| format!("script JSON: {e}"))?;
-        return v
-            .into_iter()
-            .enumerate()
-            .map(|(i, step)| {
-                let cmd = step.get("command").and_then(Value::as_str).ok_or(format!("step {i}: missing `command`"))?;
-                Ok((cmd.to_string(), step.get("params").cloned().unwrap_or(json!({}))))
-            })
-            .collect();
-    }
-    let mut out = Vec::new();
-    for (n, line) in text.lines().enumerate() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        let (cmd, rest) = line.split_once(char::is_whitespace).unwrap_or((line, ""));
-        let params = if rest.trim().is_empty() {
-            json!({})
-        } else {
-            serde_json::from_str(rest.trim()).map_err(|e| format!("line {}: {e}", n + 1))?
-        };
-        out.push((cmd.to_string(), params));
-    }
-    Ok(out)
-}
+pub use formcraft_engine::script::parse as parse_script;
 
 fn run(args: &[String]) -> Result<(), String> {
     let mut script = None;
@@ -158,20 +129,4 @@ fn info(path: &Path) -> Result<(), String> {
             .unwrap_or_default()
     );
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn scripts_parse_in_both_forms() {
-        let a = parse_script("# plate\nsolid.box {\"size\": [1,2,3]}\n\nmodel.inspect\n").unwrap();
-        assert_eq!(a.len(), 2);
-        assert_eq!(a[0].0, "solid.box");
-        let b = parse_script("[{\"command\": \"solid.box\", \"params\": {\"size\": [1,2,3]}}]").unwrap();
-        assert_eq!(b[0].1["size"][2], 3);
-        assert!(parse_script("solid.box {bad").is_err());
-        assert!(parse_script("[{\"params\": {}}]").is_err());
-    }
 }

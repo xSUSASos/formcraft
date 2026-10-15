@@ -23,6 +23,7 @@ fn main() -> ExitCode {
             "--float-browser" => opts.float_browser = true,
             "--text-commands" => opts.text_commands = true,
             "--view" => opts.view = args.next(),
+            "--script" => opts.script = args.next().map(Into::into),
             "--theme" => {
                 opts.theme = match args.next().as_deref() {
                     Some("light") => Some(ThemeKind::Light),

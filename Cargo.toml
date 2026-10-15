@@ -44,6 +44,9 @@ occt-sys = "=7.8.1"
 egui = "0.36"
 eframe = { version = "0.36", default-features = false, features = ["wgpu", "default_fonts", "persistence", "x11", "wayland"] }
 egui-wgpu = "0.36"
+# must match egui-wgpu's wgpu
+wgpu = { version = "30", default-features = false, features = ["wgsl", "dx12", "vulkan", "metal", "gles"] }
+pollster = "0.4"
 egui_kittest = "0.36"
 rfd = "0.17"
 image = { version = "0.25", default-features = false, features = ["png"] }

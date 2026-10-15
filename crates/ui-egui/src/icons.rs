@@ -223,6 +223,136 @@ pub fn paint(p: &Painter, r: Rect, id: &str, color: Color32, t: &Tokens) {
             let v = vec![u(r, 0.5, 0.1), u(r, 0.9, 0.5), u(r, 0.5, 0.9), u(r, 0.1, 0.5)];
             p.add(egui::Shape::convex_polygon(v, t.accent, Stroke::NONE));
         }
+        "press_pull" => {
+            p.rect_stroke(Rect::from_min_max(u(r, 0.12, 0.62), u(r, 0.88, 0.9)), 0.0, s, StrokeKind::Inside);
+            p.arrow(u(r, 0.5, 0.33), Vec2::new(0.0, -0.22 * r.height()), accent);
+            p.arrow(u(r, 0.5, 0.33), Vec2::new(0.0, 0.22 * r.height()), accent);
+        }
+        "combine" => {
+            let a = Rect::from_min_max(u(r, 0.1, 0.1), u(r, 0.65, 0.65));
+            let b = Rect::from_min_max(u(r, 0.35, 0.35), u(r, 0.9, 0.9));
+            p.rect_filled(a.intersect(b), 0.0, t.accent.gamma_multiply(0.5));
+            p.rect_stroke(a, 0.0, s, StrokeKind::Inside);
+            p.rect_stroke(b, 0.0, s, StrokeKind::Inside);
+        }
+        "move" => {
+            for (dx, dy) in [(0.0, -1.0), (0.0, 1.0), (-1.0, 0.0), (1.0, 0.0)] {
+                p.arrow(c, Vec2::new(dx, dy) * rad * 0.8, s);
+            }
+            p.rect_stroke(Rect::from_center_size(c, Vec2::splat(rad * 0.4)), 0.0, accent, StrokeKind::Inside);
+        }
+        "parameters" => {
+            p.rect_stroke(Rect::from_min_max(u(r, 0.08, 0.15), u(r, 0.55, 0.85)), 0.0, s, StrokeKind::Inside);
+            p.line_segment([u(r, 0.08, 0.38), u(r, 0.55, 0.38)], s);
+            p.line_segment([u(r, 0.08, 0.62), u(r, 0.55, 0.62)], s);
+            poly(p, r, &[(0.92, 0.2), (0.68, 0.2), (0.82, 0.5), (0.68, 0.8), (0.92, 0.8)], accent, false);
+        }
+        "measure" => {
+            p.rect_stroke(Rect::from_min_max(u(r, 0.05, 0.35), u(r, 0.95, 0.65)), 0.0, s, StrokeKind::Inside);
+            for i in 1..=5 {
+                let x = 0.05 + 0.15 * i as f32;
+                let len = if i % 2 == 1 { 0.5 } else { 0.58 };
+                p.line_segment([u(r, x, 0.35), u(r, x, len)], s);
+            }
+        }
+        "section" => {
+            iso_box(p, r, s, Some(fill));
+            poly(p, r, &[(0.1, 0.6), (0.7, 0.2), (0.95, 0.45), (0.35, 0.9)], accent, true);
+        }
+        "properties" => {
+            p.rect_stroke(Rect::from_min_max(u(r, 0.2, 0.08), u(r, 0.8, 0.92)), 1.0, s, StrokeKind::Inside);
+            p.circle_filled(u(r, 0.5, 0.2), s.width * 0.9, t.accent);
+            p.line_segment([u(r, 0.5, 0.3), u(r, 0.5, 0.4)], accent);
+            for y in [0.54, 0.68, 0.82] {
+                p.line_segment([u(r, 0.32, y), u(r, 0.68, y)], s);
+            }
+        }
+        "dimension" => {
+            p.line_segment([u(r, 0.1, 0.2), u(r, 0.1, 0.75)], s);
+            p.line_segment([u(r, 0.9, 0.2), u(r, 0.9, 0.75)], s);
+            p.arrow(u(r, 0.5, 0.55), Vec2::new(-0.4 * r.width(), 0.0), accent);
+            p.arrow(u(r, 0.5, 0.55), Vec2::new(0.4 * r.width(), 0.0), accent);
+        }
+        "arc" => {
+            let pts: Vec<(f32, f32)> = (0..=12)
+                .map(|i| {
+                    let a = std::f32::consts::PI * i as f32 / 12.0;
+                    (0.5 - 0.38 * a.cos(), 0.75 - 0.55 * a.sin())
+                })
+                .collect();
+            poly(p, r, &pts, s, false);
+            for (x, y) in [(0.12, 0.75), (0.5, 0.2), (0.88, 0.75)] {
+                p.circle_filled(u(r, x, y), s.width * 1.5, t.accent);
+            }
+        }
+        "c_coincident" => {
+            p.line_segment([u(r, 0.1, 0.8), u(r, 0.5, 0.5)], s);
+            p.line_segment([u(r, 0.9, 0.8), u(r, 0.5, 0.5)], s);
+            p.circle_filled(u(r, 0.5, 0.5), s.width * 2.0, t.accent);
+        }
+        "c_horizontal" => {
+            p.line_segment([u(r, 0.1, 0.8), u(r, 0.9, 0.8)], s);
+            p.line_segment([u(r, 0.35, 0.2), u(r, 0.35, 0.6)], s);
+            p.line_segment([u(r, 0.65, 0.2), u(r, 0.65, 0.6)], s);
+            p.line_segment([u(r, 0.35, 0.4), u(r, 0.65, 0.4)], accent);
+        }
+        "c_parallel" => {
+            p.line_segment([u(r, 0.15, 0.85), u(r, 0.55, 0.15)], s);
+            p.line_segment([u(r, 0.45, 0.85), u(r, 0.85, 0.15)], accent);
+        }
+        "c_perpendicular" => {
+            p.line_segment([u(r, 0.12, 0.85), u(r, 0.88, 0.85)], s);
+            p.line_segment([u(r, 0.5, 0.85), u(r, 0.5, 0.15)], accent);
+        }
+        "c_tangent" => {
+            p.circle_stroke(u(r, 0.5, 0.6), rad * 0.6, s);
+            p.line_segment([u(r, 0.08, 0.3), u(r, 0.92, 0.3)], accent);
+        }
+        "c_equal" => {
+            p.line_segment([u(r, 0.2, 0.38), u(r, 0.8, 0.38)], s);
+            p.line_segment([u(r, 0.2, 0.62), u(r, 0.8, 0.62)], accent);
+        }
+        "c_fix" => {
+            let body = Rect::from_min_max(u(r, 0.2, 0.45), u(r, 0.8, 0.9));
+            p.rect_filled(body, 2.0, fill);
+            p.rect_stroke(body, 2.0, s, StrokeKind::Inside);
+            let mut pts = vec![(0.7, 0.45)];
+            pts.extend((0..=10).map(|i| {
+                let a = std::f32::consts::PI * i as f32 / 10.0;
+                (0.5 + 0.2 * a.cos(), 0.35 - 0.2 * a.sin())
+            }));
+            pts.push((0.3, 0.45));
+            poly(p, r, &pts, s, false);
+            p.circle_filled(u(r, 0.5, 0.67), s.width * 1.2, t.accent);
+        }
+        "scripts" => {
+            p.rect_stroke(Rect::from_min_max(u(r, 0.15, 0.08), u(r, 0.85, 0.92)), 1.0, s, StrokeKind::Inside);
+            poly(p, r, &[(0.42, 0.35), (0.3, 0.5), (0.42, 0.65)], accent, false);
+            poly(p, r, &[(0.58, 0.35), (0.7, 0.5), (0.58, 0.65)], accent, false);
+            p.line_segment([u(r, 0.53, 0.33), u(r, 0.47, 0.67)], s);
+        }
+        "console" => {
+            p.rect_stroke(Rect::from_min_max(u(r, 0.08, 0.18), u(r, 0.92, 0.82)), 2.0, s, StrokeKind::Inside);
+            poly(p, r, &[(0.22, 0.38), (0.38, 0.5), (0.22, 0.62)], accent, false);
+            p.line_segment([u(r, 0.5, 0.66), u(r, 0.75, 0.66)], s);
+        }
+        "settings" => {
+            p.circle_stroke(c, rad * 0.5, s);
+            for i in 0..8 {
+                let a = i as f32 * std::f32::consts::FRAC_PI_4;
+                let d = Vec2::new(a.cos(), a.sin());
+                p.line_segment([c + d * rad * 0.5, c + d * rad * 0.85], Stroke::new(s.width * 1.6, color));
+            }
+            p.circle_stroke(c, rad * 0.18, accent);
+        }
+        "plugin" => {
+            let body = Rect::from_min_max(u(r, 0.25, 0.4), u(r, 0.75, 0.7));
+            p.rect_filled(body, 2.0, fill);
+            p.rect_stroke(body, 2.0, s, StrokeKind::Inside);
+            p.line_segment([u(r, 0.38, 0.12), u(r, 0.38, 0.4)], accent);
+            p.line_segment([u(r, 0.62, 0.12), u(r, 0.62, 0.4)], accent);
+            p.line_segment([u(r, 0.5, 0.7), u(r, 0.5, 0.92)], s);
+        }
         _ => {
             p.rect_stroke(r.shrink(1.0), 3.0, s, StrokeKind::Inside);
             let letter = id.chars().find(|ch| ch.is_alphanumeric()).unwrap_or('?').to_ascii_uppercase();

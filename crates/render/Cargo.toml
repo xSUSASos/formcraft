@@ -16,3 +16,10 @@ formcraft-tess = { workspace = true }
 glam = { workspace = true }
 serde = { workspace = true }
 bytemuck = { workspace = true }
+wgpu = { workspace = true }
+pollster = { workspace = true }
+thiserror = { workspace = true }
+image = { workspace = true }
+
+[dev-dependencies]
+formcraft-occt = { workspace = true }

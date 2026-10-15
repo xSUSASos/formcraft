@@ -12,6 +12,7 @@ mod builtin;
 mod modeling;
 pub mod params;
 mod registry;
+pub mod script;
 pub mod selection;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};

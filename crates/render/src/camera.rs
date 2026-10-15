@@ -99,8 +99,8 @@ impl Camera {
     /// wgpu-style projection (depth 0..1).
     pub fn proj(&self, aspect: f64) -> DMat4 {
         let aspect = if aspect.is_finite() && aspect > 1e-6 { aspect } else { 1.0 };
-        let near = (self.distance * 1e-3).max(1e-4);
-        let far = self.distance * 1e3 + 1e4;
+        let near = (self.distance * 1e-2).max(1e-4);
+        let far = self.distance * 100.0;
         match self.projection {
             Projection::Perspective => DMat4::perspective_rh(self.fov_y, aspect, near, far),
             Projection::Orthographic => {
