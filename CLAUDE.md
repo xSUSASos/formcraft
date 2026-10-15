@@ -10,9 +10,11 @@ Decisions: `docs/adr/`. Architecture and layering: `docs/architecture.md`.
 3. Update `PROGRESS.md` after every step. Decide yourself; record decisions as ADRs.
 
 ## Build (Windows dev machine)
-- The repo path contains Cyrillic: always `CARGO_TARGET_DIR=C:/fc-target/ws` (OCCT/CMake/MSVC).
-- The first build compiles OpenCascade (30–60 min). Run long builds as a detached process
-  (`C:/fc-target/build-ws.cmd`), not as a foreground tool call.
+- Default `target/` works (OCCT builds there). The repo path contains Cyrillic: FreeCADCmd,
+  `ollama create -f` and cmd.exe batch files fail on it — use ASCII temp dirs for those.
+- The first build compiles OpenCascade (30–60 min); later builds are incremental.
+- STEP tests live in `crates/occt/tests/step.rs` (`harness = false`): libtest binaries crash at
+  exit after STEP transfers, plain programs don't.
 - `cargo xtask ci` = fmt, clippy -D warnings, tests, layers, cargo deny.
 
 ## Never crash

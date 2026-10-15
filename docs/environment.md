@@ -32,9 +32,14 @@ ollama create qwen2.5-coder:7b -f models/qwen2.5-coder-7b.Modelfile
 
 ## Особенности сборки на Windows
 
-- Путь репозитория содержит кириллицу. MSVC/CMake (сборка OpenCascade) и FreeCADCmd с ним
-  ненадёжны, поэтому `CARGO_TARGET_DIR` указывает на ASCII-путь (`C:\fc-target\...`), а файлы для
-  FreeCAD копируются во временную ASCII-папку.
+- Путь репозитория содержит кириллицу. Cargo, CMake и MSVC (сборка OCCT в обычном `target/`)
+  с ним работают. Не работают FreeCADCmd, `ollama create -f` и bat-файлы `cmd.exe` с `chcp 65001`
+  (строки пропускаются): для них файлы кладутся в `C:\fc-target` / `C:\fc-models`.
+- Первая сборка OCCT (occt-sys) — 30–60 минут, дальше инкрементально.
+- После любого STEP-обмена тестовый бинарник libtest падает с access violation при выходе
+  процесса (все тесты уже прошли); обычные программы выходят чисто. Поэтому STEP-тесты —
+  `crates/occt/tests/step.rs` с `harness = false`.
+- Ollama 0.40.4 не видит RTX 4050 (`initial_count=0` при discovery), модели идут на CPU.
 - CMake 4 отказывается от `cmake_minimum_required` < 3.5 в исходниках OCCT:
   `CMAKE_POLICY_VERSION_MINIMUM=3.5` (задано в `.cargo/config.toml`).
 
