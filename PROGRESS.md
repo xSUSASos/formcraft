@@ -4,17 +4,17 @@
 > Сессии иногда обрываются: PROGRESS.md обновлять после каждого шага, сборки > 10 мин — фоном.
 
 ## Сейчас
-- **Фаза:** 4 — Команды, CLI, MCP (в работе). Фаза 3 закрыта, тег phase-3.
-- **Сделано в фазе 4:** шаги 1–5 — `render::headless` (PNG), CLI `convert`/`render`/`mcp [--port N]`, крейт `mcp` (stdio JSON-RPC, инструменты execute/list_commands/inspect_model/render/list_selectors/run_script/new_design; screenshot/ui_click для Remote). Control channel `formcraft --control PORT` (`crates/ui-egui/src/control.rs`; общие методы сессии в `render::control`), `.mcp.json`. Кронштейн собран через MCP в живом окне (`docs/images/phase4-mcp-remote.png`). CI зелёный.
-- **Следующий шаг:** 6 — ADR 0003 «Plugin API v1» (WIT), затем 7.
-- **План фазы 4:**
-  1. `render::headless`: PNG тел (headless wgpu) — для `formcraft-cli render` и MCP `render`.
-  2. CLI: `convert` (STEP→STL/STEP), `render`, `mcp`.
-  3. Крейт `mcp`: JSON-RPC 2.0 по stdio, инструменты `execute`, `list_commands`, `inspect_model`, `render`, `list_selectors`, `screenshot`, `ui_click`; бэкенды Headless (сессия в процессе) и Remote (TCP control channel запущенного приложения).
-  4. Control channel в приложении: `formcraft --control PORT` (127.0.0.1, JSON-строки: engine.execute, model.inspect, ui.screenshot, ui.click, ui.render).
-  5. `.mcp.json` в репо (formcraft-cli mcp) + проверка: построить кронштейн через MCP, проверить inspect_model и render.
-  6. ADR 0003 «Plugin API v1» (WIT), без реализации.
-  7. docs/learn/phase-4.md, тег phase-4.
+- **Фаза:** 5 — Встроенный ИИ (в работе). Фаза 4 закрыта, тег phase-4.
+- **Следующий шаг:** 1 — engine: `Session::fork` (сессия для фонового ИИ), `Session::transaction` (один шаг undo, фичи группой на таймлайне, именованные группы в документе).
+- **План фазы 5:**
+  1. engine: fork, transaction + группы фич.
+  2. Крейт `ai`: `LlmBackend` (Ollama `/api/chat` со схемой в `format`, OpenAI-совместимый `/v1/chat/completions`, Mock), свой минимальный HTTP/1.1-клиент (только http, локальные серверы), конфиг из env (`FORMCRAFT_AI_BACKEND/URL/MODEL`).
+  3. Промпт и схема вывода из реестра (только команды с `ai`), план `{summary, parameters, steps}`, разбор с допуском (```json-обёртки), валидация.
+  4. Конвейер: LLM → план → применение на fork в transaction → проверка regen → до 3 попыток с отчётом об ошибке → Proposal (превью). Логи `logs/ai/*.jsonl`. Команды `ai.generate`, `ai.explain`, `ai.status`.
+  5. 20+ few-shot (делегировать Sonnet по формату), выбор k ближайших к запросу.
+  6. UI: S-box «Сделать с ИИ» → фон, превью полупрозрачно, Принять/Отклонить, статус «Генерация… / Исправление (2/3)…», отмена; Solid → Create → Generate (диалог); «Изменить с ИИ…» по выбору; «Объяснить» на таймлайне; панель Assistant.
+  7. `ai-bench`: 50 промптов с эталонами (bbox, объём, отверстия), Mock в CI; реальный прогон на Ollama, ADR 0004 «модель по умолчанию».
+  8. learn/phase-5, приёмка, тег.
 
 ## Как собирать и проверять
 - `cargo xtask ci` — fmt, clippy -D warnings, тесты, слои, cargo deny. Обычный `target/` (первая сборка OCCT 30–60 мин).
@@ -31,8 +31,8 @@
 | 1 Каркас и оболочка UI | готово | phase-1 |
 | 2 Тело на экране | готово | phase-2 |
 | 3 Эскиз, фичи, таймлайн | готово | phase-3 |
-| 4 Команды, CLI, MCP | в работе (шаги 1–5) | — |
-| 5 Встроенный ИИ | — | — |
+| 4 Команды, CLI, MCP | готово | phase-4 |
+| 5 Встроенный ИИ | в работе | — |
 | 6 Плагины и скрипты | — | — |
 | 7 Шлифовка и релиз | — | — |
 
@@ -58,9 +58,11 @@
 - UI: скриншоты `docs/images/phase3-*.png` (режим эскиза, диалог+таймлайн, marking menu, манипулятор). Сравнение с п. 2: feature dialog справа ✓, манипуляторы ✓, marking menu ✓, S-box ✓, sketch palette ✓, таймлайн с иконками/маркером/ошибками ✓.
 - `.fcraft`: тест `save_and_open_round_trip`.
 
-## Приёмка Фазы 4 (собирается)
+## Приёмка Фазы 4
 - MCP по stdio, headless: `cargo test -p formcraft-mcp` — 5 passed (жизненный цикл, кронштейн через run_script + inspect_model с точным объёмом, render → PNG, ошибки протокола).
 - Живое приложение: `formcraft --control 7878` + `formcraft-cli mcp --port 7878` ← JSON-RPC из файла: run_script (кронштейн) → inspect_model (bbox 60×40×5) → ui_click {world 30,30,5} → `"hit": true, "Selected: face 4 of Body1"` → screenshot (1440×900, `docs/images/phase4-mcp-remote.png`) → render (640×480). Тест `control_channel_drives_the_app` — то же по TCP в CI.
+- «Claude Code через MCP строит кронштейн и проверяет через inspect_model и render»: выполнено (JSON-RPC в `formcraft-cli mcp` и `mcp --port` к живому окну, ответы выше).
+- ADR 0003 «Plugin API v1» + `crates/plugin-api/wit/formcraft.wit` (дизайн, реализация в фазе 6).
 - `.mcp.json` в корне: `target/debug/formcraft-cli.exe mcp` (новая сессия Claude Code подхватит после одобрения).
 
 ## Журнал
@@ -69,6 +71,8 @@
 - 2026-10-15: doc/regen/engine (undo, атомарные правки, команды), io (STL, STEP), CLI, GPU-вьюпорт с выбором. 20 иконок от Sonnet. Теги phase-1, phase-2.
 - 2026-10-15/16: фаза 3: UI (диалог из JSON-схемы с живым превью, таймлайн, режим эскиза, marking menu, S-box, манипуляторы), .fcraft, приёмка, golden.
 - 2026-10-15: sketch (решатель, профили), фичи фазы 3 с селекторами. Найдено: шум решателя 1e-12 ломал скругления OCCT → снап координат к 1e-9. Числовые углы/центры в `sketch.create` закрепляются, иначе прямоугольник растёт в обе стороны при смене параметра.
+
+- 2026-10-16: фаза 4: headless-рендер, CLI convert/render/mcp, MCP-сервер, control channel приложения, ADR 0003. Тег phase-4.
 
 ## Требует человека
 - **GitHub:** создать репозиторий и запушить (`git remote add origin …; git push -u origin main --tags`), чтобы заработал CI в `.github/workflows/ci.yml`. Публиковать без разрешения не стал.
@@ -87,3 +91,4 @@
 - `docs/learn/phase-1.md`, `docs/learn/phase-2.md` — проверены (структура, ключевые факты), без правок.
 - 10 golden-деталей (`examples/golden`, `crates/engine/tests/golden.rs`) — проверено: все зелёные, выборочно пересчитан фланец.
 - `docs/shortcuts.md`, `docs/learn/phase-3.md` — проверены, закоммичены.
+- `docs/learn/phase-4.md` — проверено: флаги и команды сверены с кодом, примеры из «Как проверить» прогнаны.
