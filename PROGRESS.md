@@ -1,52 +1,73 @@
 # FormCraft — PROGRESS
 
 > Новая сессия: «Прочитай PLAN.md и PROGRESS.md, продолжай цикл». Этот файл + `git log` — всё состояние.
-> Сессии иногда обрываются: PROGRESS.md обновлять после каждого шага, долгие (> 10 мин) сборки
-> запускать фоном.
+> Сессии иногда обрываются: PROGRESS.md обновлять после каждого шага, сборки > 10 мин — фоном.
 
 ## Сейчас
-- **Фаза:** 1 — Каркас и оболочка интерфейса (почти закрыта)
-- **Сделано в фазе 1:** workspace, xtask ci, CI workflow, вся раскладка п. 2 (app bar, toolbar с вкладками и группами, browser dock/float/close, canvas с сеткой и осями, ViewCube 26 видов + Home, navigation bar, timeline, свёрнутые Text Commands), темы, сохранение раскладки, Reset Layout, скриншоты в `docs/images/`.
-- **Осталось в фазе 1:** иконки по ТЗ (делегировать Sonnet), docs/learn/phase-1.md (делегировать), проверка приёмки и запись в этот файл, `git tag phase-1`.
-- **Дальше:** Фаза 2 — тела на экране: рендер мешей через wgpu callback, выбор граней/рёбер/тел, команды примитивов и булевых, STEP/STL экспорт, `formcraft-cli run --save`.
+- **Фаза:** 3 — Эскиз, фичи, таймлайн (начинается)
+- **Фазы 1 и 2 закрыты** (приёмка ниже). Ждём от Sonnet `docs/learn/phase-1.md` и `phase-2.md` → проверить, закоммитить, `git tag phase-1`, `git tag phase-2`.
+- **План фазы 3 (шаги):**
+  1. `sketch`: модель эскиза (точки, линии, окружности, дуги на плоскости/грани), ограничения и размеры, решатель (Ньютон–Гаусс/Левенберг–Марквардт, своя реализация), поиск замкнутых областей (профилей).
+  2. `doc`/`regen`: фичи Sketch, Extrude (новое тело/join/cut, расстояние, симметрия), Revolve, Fillet, Chamfer, Shell, Hole (простое/зенковка/цековка), Press Pull. Семантические селекторы граней/рёбер (`top`, `+X`, `vertical_edges`, `circular_edges`, `largest_planar_face`, сигнатуры) — топологическое именование.
+  3. Таймлайн в UI: иконки фич, перетаскивание, маркер отката, двойной клик = редактирование, подсветка ошибок. Таблица параметров (Change Parameters).
+  4. Feature dialog (справа, плавающий): поля с выражениями, OK/Cancel, живое превью (полупрозрачное); генерация диалога из JSON-схемы команды (пригодится плагинам). Манипуляторы (стрелка extrude, кольцо revolve).
+  5. Режим эскиза в UI: Create Sketch → выбор плоскости/грани → вид на эскиз; line/rect/circle/arc мышью, D (размер), ограничения, sketch palette, Finish Sketch.
+  6. Marking menu (правый клик), shortcut box (S) без ИИ, горячие клавиши E/L/R/C/D/F/H/Q/M + `docs/shortcuts.md`.
+  7. `.fcraft` (zip: document.json + превью PNG): сохранить/открыть.
+  8. Golden-тесты на 10 эталонных деталей (делегировать фикстуры Sonnet), приёмка: кронштейн мышью + изменение параметра.
 
 ## Как собирать и проверять
-- `cargo xtask ci` — fmt, clippy -D warnings, тесты, слои, cargo deny. Обычный `target/` (OCCT собирается там, первая сборка 30–60 мин).
-- Скриншоты: `target/debug/formcraft.exe --screenshot C:/fc-target/x.png [--theme light] [--float-browser] [--text-commands] [--view top]`, потом смотреть PNG.
-- STEP во FreeCAD: `tools/freecad_check.py` (`FC_FILES="a.step;b.step" freecadcmd script` — только ASCII-пути, `C:/fc-target/...`).
-- Ollama: сервер `%LOCALAPPDATA%\Programs\Ollama\ollama.exe serve`, модель `qwen2.5-coder:7b` создана из GGUF (`models/*.Modelfile`, копия в `C:/fc-models`).
+- `cargo xtask ci` — fmt, clippy -D warnings, тесты, слои, cargo deny. Обычный `target/` (первая сборка OCCT 30–60 мин).
+- Тесты: 81 обычных + `crates/occt/tests/step.rs` (3) + `apps/formcraft-cli/tests/acceptance.rs` (6), последние два — `harness = false`.
+- Приложение: `target/debug/formcraft.exe [--script examples/bracket.fcs] [--screenshot C:/fc-target/x.png] [--theme light] [--float-browser] [--text-commands] [--view top]`, потом смотреть PNG.
+- CLI: `target/debug/formcraft-cli.exe run examples/bracket.fcs --save C:/fc-target/b.step`, `commands`, `info file.step`.
+- FreeCAD: `FC_FILES="C:/fc-target/b.step" "%LOCALAPPDATA%/Programs/FreeCAD 1.1/bin/freecadcmd.exe" C:/fc-target/fcc.py` (`fcc.py` = копия `tools/freecad_check.py`; только ASCII-пути). Или `FREECAD_CMD=... cargo test -p formcraft-cli --test acceptance`.
+- Ollama: `%LOCALAPPDATA%\Programs\Ollama\ollama.exe serve`; модель `qwen2.5-coder:7b` создана из GGUF (`models/*.Modelfile`, копия в `C:/fc-models`). Работает на CPU.
 
 ## Фазы
 | Фаза | Статус | Тег |
 |---|---|---|
-| 0 Окружение и ядро | готово: ADR 0001, `Kernel` + `occt`, golden-тесты | phase-0 |
-| 1 Каркас и оболочка UI | почти готово | — |
-| 2 Тело на экране | — | — |
-| 3 Эскиз, фичи, таймлайн | — | — |
+| 0 Окружение и ядро | готово | phase-0 |
+| 1 Каркас и оболочка UI | готово (ждёт learn-док) | — |
+| 2 Тело на экране | готово (ждёт learn-док) | — |
+| 3 Эскиз, фичи, таймлайн | в работе | — |
 | 4 Команды, CLI, MCP | — | — |
 | 5 Встроенный ИИ | — | — |
 | 6 Плагины и скрипты | — | — |
 | 7 Шлифовка и релиз | — | — |
 
 ## Приёмка Фазы 0
-- ADR 0001 с таблицей «прошёл/не прошёл»: `docs/adr/0001-geometry-kernel.md` — OCCT 5/5, STEP во FreeCAD чистый; truck 3/5 с ошибками STEP; Fornjot 0/5.
-- Ядро за трейтом: `crates/kernel` (`Kernel`, `Shape`, `Profile`, `Mesh`) + `crates/occt`.
-- `cargo test -p formcraft-occt`: 16 passed (golden: box_hole, fillet_all, cyl_cut, revolve, shell, union/intersect, chamfer, slot с дугами, нормали, рёбра, тесселяция, BRep, compound, transform, hostile inputs, параллельность) + `tests/step.rs`: 3 passed (round trip в кириллической папке, отсутствующий и мусорный файл).
-- `cargo xtask ci`: «CI summary: all 5 steps passed».
+- ADR 0001: OCCT 5/5, STEP во FreeCAD чистый; truck 3/5 с ошибками STEP; Fornjot 0/5. Ядро за трейтом `Kernel` (`crates/kernel`) + `crates/occt` (своя обвязка).
+- `cargo test -p formcraft-occt`: 16 + `tests/step.rs` 3 — passed.
+
+## Приёмка Фазы 1
+- Окно открывается: скриншоты `docs/images/phase1-dark.png` (вся раскладка п. 2), `docs/images/phase1-light-floating-top.png` (светлая тема, browser плавающий, вид сверху, Text Commands раскрыта). Сравнение с п. 2 PLAN: app bar ✓, toolbar с вкладками Solid/Sketch/Inspect/Tools и группами с выпадающими списками ✓, browser (Document Settings, Named Views, Origin с глазами, Sketches, Bodies) ✓, canvas с сеткой ✓, ViewCube ✓, navigation bar ✓, timeline внизу ✓, Text Commands свёрнута ✓.
+- Панели двигаются/сбрасываются, орбита/пан/зум, ViewCube: `cargo test -p formcraft-ui-egui` — тесты `shift_middle_drag_orbits`, `middle_drag_pans`, `wheel_zooms_in_and_out`, `view_cube_top_face_sets_top_view`, `browser_float_close_and_reset`, `text_command_line_runs_commands`, `both_themes_render` — ok.
+- GitHub Actions: `.github/workflows/ci.yml` (Windows + Linux) написан, но не запускался — нет удалённого репозитория (см. «Требует человека»).
+
+## Приёмка Фазы 2
+- `formcraft-cli run examples/bracket.fcs --save bracket.step` → `apps/formcraft-cli/tests/acceptance.rs`: run_and_save_step/stl, step_volume, step_bbox, step_one_valid_solid — ok.
+- FreeCAD 1.1.4: `FCCHECK {"file": "bracket.step", "ok": true, "solids": 1, "faces": 8, "volume": 11657.881, "bbox": [0.0, 0.0, 0.0, 60.0, 40.0, 5.0]}`, точное значение 11657.8806 — совпадает.
+- Рендер с рёбрами, выбор и подсветка: `docs/images/phase2-bracket-selection.png` (выделена грань), тест `clicking_the_canvas_picks_faces`, `crates/render/src/gpu_tests.rs` (офскрин-рендер на локальном GPU).
+- Тела в Browser (глаз = `body.visibility`), примитивы и булевы — команды `solid.box/cylinder/sphere/combine`, экспорт STEP/STL — `doc.export` и File → Export.
 
 ## Журнал
-- 2026-10-14: репозиторий, PLAN.md, PROGRESS.md; Rust; клон `../cadcraft-ref` изучен (CommandSpec-реестр, never-crash lints, xtask ci + layers, MCP stdio JSON-RPC).
-- 2026-10-15: spike: OCCT 5/5, truck 3/5, Fornjot 0/5 → ADR 0001 (OCCT за трейтом, своя обвязка — opencascade-rs роняет процесс на исключениях OCCT).
-- 2026-10-15: `crates/occt` — свой cxx-мост, FC_GUARD, глобальный мьютекс, проверка результатов (BRepCheck, объём, bbox для shell). Реестр команд в `engine` (регистрация в рантайме, поиск, panic guard). UI-оболочка в стиле Fusion. ADR 0002 (лицензии). CI зелёный. Коммит 96c0b73.
+- 2026-10-14: репозиторий, PLAN, PROGRESS; Rust; изучен `../cadcraft-ref`.
+- 2026-10-15: spike ядер → ADR 0001; своя обвязка OCCT; реестр команд; UI-оболочка; ADR 0002. Тег phase-0.
+- 2026-10-15: doc/regen/engine (undo, атомарные правки, команды), io (STL, STEP), CLI, GPU-вьюпорт с выбором. 20 иконок от Sonnet.
 
 ## Требует человека
+- **GitHub:** создать репозиторий и запушить (`git remote add origin …; git push -u origin main --tags`), чтобы заработал CI в `.github/workflows/ci.yml`. Публиковать без разрешения не стал.
 - Прокси/VPN в fake-IP режиме ломает `ollama pull` (CDN → 198.18.x). Модели качаются вручную с Hugging Face (`docs/environment.md`). Чтобы `ollama pull` заработал: исключить `registry.ollama.ai` и `*.r2.cloudflarestorage.com` из fake-IP.
-- Ollama 0.40.4 не находит RTX 4050 (`initial_count=0`), инференс идёт на CPU (~14 с на короткий ответ 7B). Проверить: настройки графики Windows → «Высокая производительность» для `ollama.exe`/`ollama app.exe`, либо обновить Ollama. Драйверы не трогали (запрещено).
-- qwen3-8b GGUF докачивается скриптом `C:/fc-models/dl.sh` (после докачки: `ollama create qwen3:8b -f C:/fc-models/qwen3-8b.Modelfile`).
+- Ollama 0.40.4 не находит RTX 4050 (`initial_count=0`), инференс на CPU (~14 с на короткий ответ 7B). Проверить: настройки графики Windows → «Высокая производительность» для `ollama.exe`, либо обновить Ollama. Драйверы не трогали.
+- qwen3-8b GGUF: докачка скриптом `C:/fc-models/dl.sh` (запуск: `bash /c/fc-models/dl.sh`), затем `ollama create qwen3:8b -f C:/fc-models/qwen3-8b.Modelfile`.
 
 ## Тупики / известные проблемы
-- libtest + STEP: тестовый бинарник после любого STEP-обмена падает с access violation при выходе процесса (все тесты уже прошли). Обычные программы (пример с main, приложение) выходят чисто, в т.ч. с потоком и `process::exit`. Причину не нашли за отведённое время (кандидат — порядок статических деструкторов OCCT при статической компоновке). Обход: STEP-тесты — `crates/occt/tests/step.rs` с `harness = false`.
-- bat-файлы с кириллическим путём и `chcp 65001` пропускают строки (`set CARGO_TARGET_DIR` не применился) — не использовать.
+- libtest + STEP: тестовый бинарник после STEP-обмена падает с access violation при выходе процесса (тесты уже прошли). Обычные программы выходят чисто. Причину не нашли (кандидат — порядок статических деструкторов OCCT). Обход: STEP-тесты с `harness = false`.
+- bat-файлы с кириллическим путём и `chcp 65001` пропускают строки — не использовать.
+- Рёбра рисуются линиями толщиной 1 px (LineList); выделенное ребро видно слабо. Улучшить в фазе 3 (экранные квады для толстых линий).
 
 ## Делегировано Sonnet
-- `docs/learn/phase-0.md` — конспект фазы 0 по моему плану (первая попытка упала по сети, вторая успешна). Проверено: структура, числа сверены с ADR; одна устаревшая строка про `CARGO_TARGET_DIR` исправлена мной.
+- `docs/learn/phase-0.md` — проверено, одна строка исправлена.
+- 20 иконок тулбара в `crates/ui-egui/src/icons.rs` — проверено: clippy/CI зелёные, на скриншоте выглядят корректно.
+- `docs/learn/phase-1.md`, `docs/learn/phase-2.md` — в работе.
