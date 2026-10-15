@@ -417,7 +417,7 @@ impl SketchMode {
         egui::Area::new(Id::new("dim_input")).fixed_pos(pos + Vec2::new(12.0, -12.0)).show(ui.ctx(), |ui| {
             egui::Frame::popup(ui.style()).show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("Dimension").color(t.text_dim));
+                    ui.label(RichText::new("Dimension").color(t.text_secondary));
                     let r = ui.add(egui::TextEdit::singleline(&mut text).desired_width(90.0));
                     r.request_focus();
                     if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
@@ -450,10 +450,10 @@ impl SketchMode {
     ) {
         let scr = |q: DVec2| Self::to_screen(plane, cam, rect, q);
         let pt = |id: Eid| sk.point(id).ok().map(|(x, y)| DVec2::new(x, y));
-        let normal = Color32::from_rgb(0x4a, 0xa8, 0xff);
-        let constr = t.text_dim.gamma_multiply(0.7);
+        let normal = t.sketch_under;
+        let constr = t.sketch_construction;
         let sel = t.warning;
-        let hov = t.hover;
+        let hov = t.accent_hover;
         let color_of = |id: Eid, construction: bool| {
             if self.selected.contains(&id) {
                 sel
@@ -544,10 +544,10 @@ impl SketchMode {
                     _ => (d.value.clone(), Vec2::new(0.0, -10.0)),
                 };
                 let at = s + offset;
-                let galley = p.layout_no_wrap(text, FontId::proportional(12.0), t.text);
+                let galley = p.layout_no_wrap(text, FontId::proportional(12.0), t.text_primary);
                 let r = Rect::from_center_size(at, galley.size() + Vec2::new(6.0, 2.0));
-                p.rect_filled(r, 2.0, t.panel.gamma_multiply(0.85));
-                p.galley(r.min + Vec2::new(3.0, 1.0), galley, t.text);
+                p.rect_filled(r, 2.0, t.panel_bg.gamma_multiply(0.85));
+                p.galley(r.min + Vec2::new(3.0, 1.0), galley, t.text_primary);
             }
         }
         // Rubber band for the tool in progress.
@@ -556,7 +556,7 @@ impl SketchMode {
                 Some(Hit::Point(id)) => pt(id).unwrap_or(c),
                 _ => c,
             };
-            let band = t.hover.gamma_multiply(0.8);
+            let band = t.accent_hover.gamma_multiply(0.8);
             match self.tool {
                 Tool::Line => poly(&[first.p, cur], band, 1.5),
                 Tool::Rectangle => poly(
@@ -585,14 +585,14 @@ impl SketchMode {
                     Align2::LEFT_TOP,
                     format!("{:.2}, {:.2}  ({:.2})", cur.x, cur.y, d.length()),
                     FontId::monospace(11.0),
-                    t.text_dim,
+                    t.text_secondary,
                 );
             }
         }
         if let Some((id, to)) = self.drag
             && let (Some(a), Some(b)) = (pt(id).and_then(scr), scr(to))
         {
-            p.line_segment([a, b], Stroke::new(1.0, t.hover));
+            p.line_segment([a, b], Stroke::new(1.0, t.accent_hover));
         }
     }
 
@@ -603,7 +603,7 @@ impl SketchMode {
             Some(r) => (Some(r.dof), Some(r.sketch.clone())),
             None => (None, None),
         };
-        ui.label(RichText::new("SKETCH PALETTE").size(11.0).strong().color(t.text_dim));
+        ui.label(RichText::new("SKETCH PALETTE").size(11.0).strong().color(t.text_secondary));
         ui.separator();
         egui::Grid::new("sketch_tools").num_columns(2).show(ui, |ui| {
             for (i, tool) in [Tool::Select, Tool::Line, Tool::Rectangle, Tool::Circle, Tool::Arc, Tool::Dimension]

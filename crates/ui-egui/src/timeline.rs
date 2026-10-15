@@ -74,7 +74,7 @@ pub fn ui(ui: &mut Ui, t: &Tokens, s: &Session) -> Option<Action> {
                 Align2::LEFT_CENTER,
                 "Timeline: no features yet",
                 FontId::proportional(12.0),
-                t.text_dim,
+                t.text_secondary,
             );
             return;
         }
@@ -93,9 +93,9 @@ pub fn ui(ui: &mut Ui, t: &Tokens, s: &Session) -> Option<Action> {
             let rolled = i >= active;
             let err = matches!(status, Some(Status::Error(_)));
             if resp.hovered() {
-                ui.painter().rect_filled(r, 3.0, t.hover.gamma_multiply(0.25));
+                ui.painter().rect_filled(r, 3.0, t.accent_hover.gamma_multiply(0.25));
             }
-            let color = if rolled || f.suppressed { t.text_dim.gamma_multiply(0.45) } else { t.text };
+            let color = if rolled || f.suppressed { t.text_secondary.gamma_multiply(0.45) } else { t.text_primary };
             icons::paint(ui.painter(), r.shrink(4.0), icon_for(f.kind.base_name()), color, t);
             if err {
                 ui.painter().rect_stroke(r, 3.0, Stroke::new(2.0, t.error), StrokeKind::Inside);

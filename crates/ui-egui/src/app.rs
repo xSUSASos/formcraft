@@ -19,7 +19,7 @@ use crate::dialog::{FeatureDialog, Outcome};
 use crate::icons;
 use crate::layout::{Dock, Layout, VisualStyle};
 use crate::sketch_mode::{Request, SketchMode, Tool};
-use crate::theme::{ThemeKind, Tokens};
+use crate::theme::{SIZE, ThemeKind, Tokens};
 use crate::timeline;
 use crate::toolbar::{self, Action};
 use crate::viewcube::{self, CubeAction};
@@ -116,6 +116,7 @@ pub struct FormCraftApp {
     control_renderer: Option<Result<formcraft_render::gpu::Renderer, String>>,
     /// `ui.screenshot` requests waiting for the next frame's pixels.
     pending_shots: Vec<(control::Reply, Option<PathBuf>)>,
+    fonts_installed: bool,
 }
 
 /// Marks screenshots requested through the control channel.
@@ -214,6 +215,7 @@ impl FormCraftApp {
             control: None,
             control_renderer: None,
             pending_shots: Vec::new(),
+            fonts_installed: false,
         };
         if let Some(path) = app.options.script.clone() {
             app.run_script_file(&path);
@@ -851,8 +853,9 @@ impl FormCraftApp {
     fn app_bar(&mut self, ui: &mut Ui, t: &Tokens) {
         Panel::top("app_bar")
             .exact_size(30.0)
-            .frame(egui::Frame::new().fill(t.app_bar).inner_margin(egui::Margin::symmetric(8, 4)))
+            .frame(egui::Frame::new().fill(t.appbar_bg).inner_margin(egui::Margin::symmetric(8, 4)))
             .show(ui, |ui| {
+                ui.visuals_mut().override_text_color = Some(t.appbar_fg);
                 ui.horizontal_centered(|ui| {
                     ui.label(egui::RichText::new("FormCraft").strong().color(t.accent));
                     ui.separator();
@@ -891,8 +894,8 @@ impl FormCraftApp {
                         rect.center(),
                         Align2::CENTER_CENTER,
                         &self.doc_name,
-                        FontId::proportional(13.0),
-                        t.text,
+                        FontId::proportional(SIZE.font_panel),
+                        t.appbar_fg,
                     );
                 });
             });
@@ -971,7 +974,7 @@ impl FormCraftApp {
     fn toolbar(&mut self, ui: &mut Ui, t: &Tokens) {
         let mut action = None;
         Panel::top("toolbar")
-            .frame(egui::Frame::new().fill(t.toolbar).inner_margin(egui::Margin::symmetric(8, 4)))
+            .frame(egui::Frame::new().fill(t.toolbar_bg).inner_margin(egui::Margin::symmetric(8, 4)))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
                     egui::ComboBox::from_id_salt("workspace")
@@ -995,7 +998,7 @@ impl FormCraftApp {
 
     fn browser_contents(&mut self, ui: &mut Ui, t: &Tokens) {
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new("BROWSER").size(11.0).strong().color(t.text_dim));
+            ui.label(egui::RichText::new("BROWSER").size(11.0).strong().color(t.text_secondary));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if icons::button(ui, t, "close", "Close", 16.0, true, false).clicked() {
                     self.layout.browser.open = false;
@@ -1043,12 +1046,12 @@ impl FormCraftApp {
                         .map(|f| (f.id, f.name.clone()))
                         .collect();
                     if sketches.is_empty() {
-                        ui.label(egui::RichText::new("(none)").color(t.text_dim));
+                        ui.label(egui::RichText::new("(none)").color(t.text_secondary));
                     }
                     for (id, name) in sketches {
                         ui.horizontal(|ui| {
                             let (r, _) = ui.allocate_exact_size(Vec2::splat(16.0), Sense::hover());
-                            crate::icons::paint(ui.painter(), r, "sketch", t.text, t);
+                            crate::icons::paint(ui.painter(), r, "sketch", t.text_primary, t);
                             let dof = self.session.model().sketch(id).map(|s| s.dof);
                             let resp = ui.selectable_label(false, &name);
                             let resp = match dof {
@@ -1066,7 +1069,7 @@ impl FormCraftApp {
                     let bodies: Vec<(BodyId, String, bool)> =
                         self.session.model().bodies.iter().map(|b| (b.id, b.name.clone(), b.visible)).collect();
                     if bodies.is_empty() {
-                        ui.label(egui::RichText::new("(none)").color(t.text_dim));
+                        ui.label(egui::RichText::new("(none)").color(t.text_secondary));
                     }
                     for (id, name, visible) in bodies {
                         ui.horizontal(|ui| {
@@ -1112,7 +1115,7 @@ impl FormCraftApp {
                     .resizable(true)
                     .default_size(self.layout.browser.size)
                     .size_range(150.0..=700.0)
-                    .frame(egui::Frame::new().fill(t.panel).inner_margin(6))
+                    .frame(egui::Frame::new().fill(t.panel_bg).inner_margin(6))
                     .show(ui, |ui| self.browser_contents(ui, t));
                 self.layout.browser.size = r.response.rect.width();
             }
@@ -1142,7 +1145,7 @@ impl FormCraftApp {
         let mut action = None;
         Panel::bottom("timeline")
             .exact_size(self.layout.timeline.size)
-            .frame(egui::Frame::new().fill(t.panel).inner_margin(egui::Margin::symmetric(8, 6)))
+            .frame(egui::Frame::new().fill(t.panel_bg).inner_margin(egui::Margin::symmetric(8, 6)))
             .show(ui, |ui| action = timeline::ui(ui, t, &self.session));
         let Some(a) = action else { return };
         use serde_json::json;
@@ -1187,7 +1190,7 @@ impl FormCraftApp {
                         }
                         let r = ui.add(
                             egui::Label::new(
-                                egui::RichText::new("TEXT COMMANDS").size(10.5).strong().color(t.text_dim),
+                                egui::RichText::new("TEXT COMMANDS").size(10.5).strong().color(t.text_secondary),
                             )
                             .sense(Sense::click()),
                         );
@@ -1204,10 +1207,10 @@ impl FormCraftApp {
             .resizable(true)
             .default_size(self.layout.text_commands.size)
             .size_range(80.0..=600.0)
-            .frame(egui::Frame::new().fill(t.panel).inner_margin(6))
+            .frame(egui::Frame::new().fill(t.panel_bg).inner_margin(6))
             .show_collapsible(ui, &mut open, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new("TEXT COMMANDS").size(11.0).strong().color(t.text_dim));
+                    ui.label(egui::RichText::new("TEXT COMMANDS").size(11.0).strong().color(t.text_secondary));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if icons::button(ui, t, "dropdown", "Collapse", 16.0, true, false).clicked() {
                             self.layout.text_commands.open = false;
@@ -1219,7 +1222,7 @@ impl FormCraftApp {
                     ui,
                     |ui| {
                         for e in self.session.log() {
-                            let c = if e.ok { t.text } else { t.error };
+                            let c = if e.ok { t.text_primary } else { t.error };
                             ui.label(
                                 egui::RichText::new(format!("{} {} → {}", e.command, e.params, e.message))
                                     .monospace()
@@ -1346,7 +1349,7 @@ impl FormCraftApp {
                 painter.line_segment([to_pos(p), to_pos(q)], Stroke::new(1.5, t.axis_z));
             }
             if let Some(o) = self.camera.project(DVec3::ZERO, size) {
-                painter.circle_filled(to_pos(o), 3.0, t.text_dim);
+                painter.circle_filled(to_pos(o), 3.0, t.text_secondary);
             }
             self.paint_origin_items(&painter, t, size, to_pos);
         }
@@ -1373,7 +1376,7 @@ impl FormCraftApp {
             Align2::LEFT_BOTTOM,
             &self.status,
             FontId::proportional(12.0),
-            t.text_dim,
+            t.text_secondary,
         );
     }
 
@@ -1597,9 +1600,9 @@ impl FormCraftApp {
         let pos = pos2(canvas.center().x, canvas.bottom() - 12.0);
         egui::Area::new(Id::new("nav_bar")).fixed_pos(pos).pivot(Align2::CENTER_BOTTOM).show(ui.ctx(), |ui| {
             egui::Frame::new()
-                .fill(t.panel.gamma_multiply(0.95))
+                .fill(t.panel_bg.gamma_multiply(0.95))
                 .corner_radius(6)
-                .stroke(Stroke::new(1.0, t.separator))
+                .stroke(Stroke::new(1.0, t.divider))
                 .inner_margin(egui::Margin::symmetric(8, 3))
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
@@ -1710,6 +1713,11 @@ impl FormCraftApp {
     /// Paint the whole UI into `ui` (the root of the window).
     pub fn draw(&mut self, ui: &mut Ui) {
         let t = self.tokens();
+        if !self.fonts_installed {
+            crate::theme::install_fonts(ui.ctx());
+            ui.ctx().all_styles_mut(Tokens::apply_text_styles);
+            self.fonts_installed = true;
+        }
         ui.ctx().set_visuals(t.visuals());
         self.serve_control(ui);
         self.shortcuts(ui);
@@ -1736,7 +1744,7 @@ struct EngineErrorText(String);
 
 fn eye_toggle(ui: &mut Ui, t: &Tokens, visible: &mut bool) {
     let (rect, resp) = ui.allocate_exact_size(Vec2::splat(16.0), Sense::click());
-    let c = if *visible { t.text } else { t.text_dim.gamma_multiply(0.5) };
+    let c = if *visible { t.text_primary } else { t.text_secondary.gamma_multiply(0.5) };
     crate::icons::paint(ui.painter(), rect, "eye", c, t);
     if resp.on_hover_text(if *visible { "Hide" } else { "Show" }).clicked() {
         *visible = !*visible;

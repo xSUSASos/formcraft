@@ -15,14 +15,11 @@ use formcraft_render::scene::{self, GridColors, Item, Scene, linear};
 use glam::DVec2;
 
 use crate::layout::VisualStyle;
-use crate::theme::Tokens;
+use crate::theme::{SIZE, Tokens};
 
 fn rgba(c: Color32) -> [f32; 4] {
     linear([c.r(), c.g(), c.b(), c.a()])
 }
-
-/// Body colour (a neutral steel blue-grey, like a CAD default material).
-const BODY: [u8; 4] = [0xb4, 0xbd, 0xc8, 0xff];
 
 pub struct Viewport {
     gpu: Option<(egui_wgpu::RenderState, Renderer)>,
@@ -80,10 +77,11 @@ impl Viewport {
             return;
         }
         let Some((_, r)) = self.gpu.as_mut() else { return };
-        let base = linear(BODY);
-        let edge = rgba(Color32::from_rgb(0x20, 0x24, 0x2a));
-        let selected = rgba(t.accent);
-        let hover = rgba(t.hover);
+        let base = rgba(t.body);
+        let edge = rgba(t.body_edge);
+        // §2.3: selection = accent at 45% over the body, hover = light blue tint
+        let selected = rgba(crate::theme::mix(t.body, t.selected_3d, SIZE.selected_mix));
+        let hover = rgba(crate::theme::mix(t.body, t.hover_3d, SIZE.hover_mix));
         for (key, m) in &self.meshes {
             let body = BodyId(*key as u32);
             let body_sel = sel.contains(&Pick::Body { body });

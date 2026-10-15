@@ -53,7 +53,7 @@ pub fn marking_menu(ui: &mut Ui, t: &Tokens, s: &Session, at: Pos2, last: Option
             let c = rect.min + Vec2::splat(radius + 70.0);
             let p = ui.painter();
             p.circle_filled(c, 7.0, t.accent.gamma_multiply(0.6));
-            p.circle_stroke(c, radius * 0.45, Stroke::new(1.0, t.separator));
+            p.circle_stroke(c, radius * 0.45, Stroke::new(1.0, t.divider));
             for (i, id) in RADIAL.iter().enumerate() {
                 let Some((label, icon)) = label_for(s, id, last) else { continue };
                 // Compass slots: N, NE, E, SE, S, SW, W, NW. Right-side pills grow to the right,
@@ -79,14 +79,14 @@ pub fn marking_menu(ui: &mut Ui, t: &Tokens, s: &Session, at: Pos2, last: Option
                 };
                 let r = Rect::from_min_size(Pos2::new(min_x, anchor.y - 13.0), Vec2::new(w, 26.0));
                 let resp = ui.interact(r, Id::new(("mm", i)), Sense::click());
-                let fill = if resp.hovered() { t.selection } else { t.panel };
+                let fill = if resp.hovered() { t.accent } else { t.panel_bg };
                 p.rect_filled(r, 13.0, fill);
-                p.rect_stroke(r, 13.0, Stroke::new(1.0, t.separator), egui::StrokeKind::Inside);
+                p.rect_stroke(r, 13.0, Stroke::new(1.0, t.divider), egui::StrokeKind::Inside);
                 icons::paint(
                     p,
                     Rect::from_center_size(r.left_center() + Vec2::new(16.0, 0.0), Vec2::splat(16.0)),
                     &icon,
-                    t.text,
+                    t.text_primary,
                     t,
                 );
                 p.text(
@@ -94,7 +94,7 @@ pub fn marking_menu(ui: &mut Ui, t: &Tokens, s: &Session, at: Pos2, last: Option
                     Align2::LEFT_CENTER,
                     label,
                     FontId::proportional(12.0),
-                    t.text,
+                    t.text_primary,
                 );
                 if resp.clicked() {
                     out = Some(MenuAction::Run(if *id == "repeat" {
@@ -113,12 +113,12 @@ pub fn marking_menu(ui: &mut Ui, t: &Tokens, s: &Session, at: Pos2, last: Option
                 any = true;
                 let r = Rect::from_min_size(Pos2::new(x, y), Vec2::new(160.0, 22.0));
                 let resp = ui.interact(r, Id::new(("ml", id)), Sense::click());
-                p.rect_filled(r, 0.0, if resp.hovered() { t.selection } else { t.panel });
+                p.rect_filled(r, 0.0, if resp.hovered() { t.accent } else { t.panel_bg });
                 icons::paint(
                     p,
                     Rect::from_center_size(r.left_center() + Vec2::new(12.0, 0.0), Vec2::splat(14.0)),
                     &icon,
-                    t.text,
+                    t.text_primary,
                     t,
                 );
                 p.text(
@@ -126,7 +126,7 @@ pub fn marking_menu(ui: &mut Ui, t: &Tokens, s: &Session, at: Pos2, last: Option
                     Align2::LEFT_CENTER,
                     label,
                     FontId::proportional(12.0),
-                    t.text,
+                    t.text_primary,
                 );
                 if resp.clicked() {
                     out = Some(MenuAction::Run(id.to_string()));
@@ -137,7 +137,7 @@ pub fn marking_menu(ui: &mut Ui, t: &Tokens, s: &Session, at: Pos2, last: Option
                 p.rect_stroke(
                     Rect::from_min_max(Pos2::new(x, c.y + radius + 30.0), Pos2::new(x + 160.0, y)),
                     0.0,
-                    Stroke::new(1.0, t.separator),
+                    Stroke::new(1.0, t.divider),
                     egui::StrokeKind::Outside,
                 );
             }
@@ -193,11 +193,11 @@ pub fn shortcut_box(ui: &mut Ui, t: &Tokens, s: &Session, text: &mut String, at:
             for (i, h) in hits.iter().enumerate() {
                 let row = ui.horizontal(|ui| {
                     let (ir, _) = ui.allocate_exact_size(Vec2::splat(16.0), Sense::hover());
-                    icons::paint(ui.painter(), ir, &h.icon, t.text, t);
+                    icons::paint(ui.painter(), ir, &h.icon, t.text_primary, t);
                     let lr = ui.selectable_label(i == 0, &h.label);
                     if let Some(k) = &h.shortcut {
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            ui.label(RichText::new(k).color(t.text_dim).monospace());
+                            ui.label(RichText::new(k).color(t.text_secondary).monospace());
                         });
                     }
                     lr
@@ -218,7 +218,7 @@ pub fn shortcut_box(ui: &mut Ui, t: &Tokens, s: &Session, text: &mut String, at:
                 }
             }
             if hits.is_empty() && !ai && !text.trim().is_empty() {
-                ui.label(RichText::new("No matching command").color(t.text_dim));
+                ui.label(RichText::new("No matching command").color(t.text_secondary));
             }
             if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                 out = Some(match hits.first() {
@@ -296,7 +296,7 @@ pub fn parameters_window(ui: &mut Ui, t: &Tokens, rows: &mut Vec<ParamRow>, open
         }
         ui.label(
             RichText::new("Expressions may use other parameters, units (mm, cm, in, deg) and functions.")
-                .color(t.text_dim)
+                .color(t.text_secondary)
                 .size(11.0),
         );
     });

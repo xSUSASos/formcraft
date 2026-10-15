@@ -374,11 +374,11 @@ pub fn button(
     let sense = if enabled { egui::Sense::click() } else { egui::Sense::hover() };
     let (rect, resp) = ui.allocate_exact_size(Vec2::splat(size), sense);
     if selected {
-        ui.painter().rect_filled(rect, 3.0, t.selection.gamma_multiply(0.7));
+        ui.painter().rect_filled(rect, 3.0, t.accent.gamma_multiply(0.7));
     } else if enabled && resp.hovered() {
         ui.painter().rect_filled(rect, 3.0, t.panel_header);
     }
-    let color = if enabled { t.text } else { t.text_dim.gamma_multiply(0.5) };
+    let color = if enabled { t.text_primary } else { t.text_secondary.gamma_multiply(0.5) };
     paint(ui.painter(), rect.shrink(size * 0.18), id, color, t);
     resp.on_hover_text(tip)
 }

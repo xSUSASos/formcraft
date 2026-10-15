@@ -152,7 +152,7 @@ pub fn tabs(ui: &mut Ui, t: &Tokens, active: &mut String) {
             let text = egui::RichText::new(tab.to_uppercase()).size(11.5).strong().color(if on {
                 t.accent
             } else {
-                t.text_dim
+                t.text_secondary
             });
             let r = ui.add(egui::Button::new(text).frame(false).min_size(Vec2::new(64.0, 20.0)));
             if on {
@@ -189,7 +189,8 @@ pub fn groups_ui(ui: &mut Ui, t: &Tokens, reg: &Registry, tab: &str) -> Option<A
                         }
                     }
                 });
-                let title = egui::RichText::new(format!("{}    ", g.name.to_uppercase())).size(10.5).color(t.text_dim);
+                let title =
+                    egui::RichText::new(format!("{}    ", g.name.to_uppercase())).size(10.5).color(t.text_secondary);
                 let r = ui.menu_button(title, |ui| {
                     for &(id, label, icon, _) in g.items {
                         if menu_item(ui, t, label, icon, enabled(reg, id)) {
@@ -205,7 +206,7 @@ pub fn groups_ui(ui: &mut Ui, t: &Tokens, reg: &Registry, tab: &str) -> Option<A
                 // Drop-down marker after the group title.
                 let rr = r.response.rect;
                 let tri = Rect::from_min_size(rr.right_center() + Vec2::new(-12.0, -4.0), Vec2::splat(8.0));
-                icons::paint(ui.painter(), tri, "dropdown", t.text_dim, t);
+                icons::paint(ui.painter(), tri, "dropdown", t.text_secondary, t);
             });
         }
     });
@@ -218,7 +219,7 @@ fn icon_button(ui: &mut Ui, t: &Tokens, id: &str, label: &str, icon: &str, on: b
     if resp.hovered() && on {
         ui.painter().rect_filled(rect, 4.0, t.panel_header);
     }
-    let color = if on { t.text } else { t.text_dim.gamma_multiply(0.5) };
+    let color = if on { t.text_primary } else { t.text_secondary.gamma_multiply(0.5) };
     icons::paint(ui.painter(), rect.shrink(4.0), icon, color, t);
     let tip = if on { label.to_string() } else { format!("{label} (not available yet)") };
     let resp = resp.on_hover_text(tip);
@@ -229,9 +230,9 @@ fn menu_item(ui: &mut Ui, t: &Tokens, label: &str, icon: &str, on: bool) -> bool
     let row = Vec2::new(ui.available_width().max(200.0), 22.0);
     let (rect, resp) = ui.allocate_exact_size(row, if on { Sense::click() } else { Sense::hover() });
     if resp.hovered() && on {
-        ui.painter().rect_filled(rect, 3.0, t.selection.gamma_multiply(0.6));
+        ui.painter().rect_filled(rect, 3.0, t.accent.gamma_multiply(0.6));
     }
-    let color = if on { t.text } else { t.text_dim.gamma_multiply(0.6) };
+    let color = if on { t.text_primary } else { t.text_secondary.gamma_multiply(0.6) };
     let icon_rect = Rect::from_min_size(rect.min + Vec2::new(4.0, 3.0), Vec2::splat(16.0));
     icons::paint(ui.painter(), icon_rect, icon, color, t);
     ui.painter().text(

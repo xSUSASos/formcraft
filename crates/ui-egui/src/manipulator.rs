@@ -28,7 +28,7 @@ pub fn arrow(ui: &mut Ui, rect: Rect, cam: &Camera, t: &Tokens, origin: DVec3, d
     let handle = Rect::from_center_size(tip, Vec2::splat(18.0));
     let resp = ui.interact(handle, Id::new("manip_arrow"), Sense::drag());
     let hot = resp.hovered() || resp.dragged();
-    let c = if hot { t.hover } else { t.accent };
+    let c = if hot { t.accent_hover } else { t.accent };
     let p = ui.painter_at(rect);
     p.line_segment([p0, tip], Stroke::new(2.5, c));
     let d = (tip - p0).normalized();
@@ -72,7 +72,7 @@ pub fn ring(
     let tip = screen(cam, rect, pt(deg))?;
     let handle = Rect::from_center_size(tip, Vec2::splat(18.0));
     let resp = ui.interact(handle, Id::new("manip_ring"), Sense::drag());
-    let c = if resp.hovered() || resp.dragged() { t.hover } else { t.accent };
+    let c = if resp.hovered() || resp.dragged() { t.accent_hover } else { t.accent };
     p.circle_filled(tip, 7.0, c);
     if resp.dragged() {
         // Angle of the pointer around the ring centre on screen.

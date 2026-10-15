@@ -120,7 +120,7 @@ pub fn show(ui: &mut Ui, area: Rect, cam: &Camera, t: &Tokens) -> Option<CubeAct
         }
     }
     if let Some((_, poly)) = &hovered {
-        painter.add(Shape::convex_polygon(poly.to_vec(), t.hover.gamma_multiply(0.55), Stroke::NONE));
+        painter.add(Shape::convex_polygon(poly.to_vec(), t.accent_hover.gamma_multiply(0.55), Stroke::NONE));
     }
     // Axis tripod at the bottom-left corner of the cube.
     let origin = proj.to_screen(DVec3::new(-1.0, -1.0, -1.0));
@@ -132,7 +132,7 @@ pub fn show(ui: &mut Ui, area: Rect, cam: &Camera, t: &Tokens) -> Option<CubeAct
     // Home button.
     let home = Rect::from_min_size(area.min + Vec2::new(2.0, 2.0), Vec2::splat(18.0));
     let home_resp = ui.interact(home, ui.id().with("viewcube_home"), Sense::click()).on_hover_text("Home");
-    let hc = if home_resp.hovered() { t.hover } else { t.text_dim };
+    let hc = if home_resp.hovered() { t.accent_hover } else { t.text_secondary };
     let roof = [
         pos2(home.center().x, home.top() + 2.0),
         pos2(home.right() - 2.0, home.center().y),
