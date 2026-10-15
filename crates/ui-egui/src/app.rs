@@ -17,6 +17,7 @@ use serde_json::Value;
 use crate::dialog::{FeatureDialog, Outcome};
 use crate::icons;
 use crate::layout::{Dock, Layout, VisualStyle};
+use crate::menus;
 use crate::sketch_mode::{Request, SketchMode, Tool};
 use crate::theme::{ThemeKind, Tokens};
 use crate::timeline;
@@ -48,6 +49,8 @@ pub struct AppOptions {
     pub dialog: Option<String>,
     /// Edit this feature (by name) at startup: its dialog, or sketch mode for a sketch.
     pub edit: Option<String>,
+    /// Open an overlay at startup (screenshots): marking, search, parameters.
+    pub overlay: Option<String>,
 }
 
 /// Browser tree visibility toggles (Origin and bodies get real items in Phase 2).
@@ -98,6 +101,12 @@ pub struct FormCraftApp {
     rename: Option<(FeatureId, String)>,
     sketch_mode: Option<SketchMode>,
     plane_picker: bool,
+    marking: Option<Pos2>,
+    /// The marking menu opened this frame (its own click must not close it).
+    marking_fresh: bool,
+    search: Option<(String, Pos2)>,
+    params_rows: Option<Vec<menus::ParamRow>>,
+    last_command: Option<String>,
 }
 
 impl FormCraftApp {
@@ -154,6 +163,11 @@ impl FormCraftApp {
             rename: None,
             sketch_mode: None,
             plane_picker: false,
+            marking: None,
+            marking_fresh: false,
+            search: None,
+            params_rows: None,
+            last_command: None,
         };
         if let Some(path) = app.options.script.clone() {
             app.run_script_file(&path);
@@ -167,6 +181,12 @@ impl FormCraftApp {
         }
         if let Some(d) = app.options.dialog.clone() {
             app.open_dialog(&d, &Value::Null, None);
+        }
+        match app.options.overlay.as_deref() {
+            Some("marking") => app.marking = Some(Pos2::new(760.0, 420.0)),
+            Some("search") => app.search = Some(("fil".into(), Pos2::new(700.0, 300.0))),
+            Some("parameters") => app.params_rows = Some(menus::rows_from(&app.session)),
+            _ => {}
         }
         if let Some(name) = app.options.edit.clone() {
             match app.session.document().features.iter().find(|f| f.name == name).map(|f| f.id) {
@@ -216,6 +236,10 @@ impl FormCraftApp {
                 self.layout.text_commands.open = !self.layout.text_commands.open;
                 return;
             }
+            "doc.parameters" if params.is_null() => {
+                self.params_rows = Some(menus::rows_from(&self.session));
+                return;
+            }
             "tools.settings" => {
                 self.status = "Preferences: theme and layout are in the View menu".into();
                 return;
@@ -227,6 +251,7 @@ impl FormCraftApp {
         }
         // Toolbar/menu invocation of a modelling command with parameters opens its dialog.
         if params.is_null() && self.wants_dialog(id) {
+            self.last_command = Some(id.to_string());
             self.open_dialog(id, &serde_json::json!({}), None);
             return;
         }
@@ -400,6 +425,82 @@ impl FormCraftApp {
                             m.message = Some(e.to_string());
                         }
                     }
+                }
+            }
+        }
+    }
+
+    fn overlays(&mut self, ui: &mut Ui, t: &Tokens) {
+        if let Some(at) = self.marking {
+            match menus::marking_menu(ui, t, &self.session, at, self.last_command.as_deref()) {
+                Some(menus::MenuAction::Run(id)) => {
+                    self.marking = None;
+                    self.run(&id, Value::Null);
+                }
+                Some(menus::MenuAction::Close) if !self.marking_fresh => self.marking = None,
+                Some(menus::MenuAction::Close) => {}
+                None => {}
+            }
+        }
+        self.marking_fresh = false;
+        if let Some((mut text, at)) = self.search.take() {
+            match menus::shortcut_box(ui, t, &self.session, &mut text, at) {
+                Some(menus::BoxAction::Run(id)) => self.run(&id, Value::Null),
+                Some(menus::BoxAction::Ai(prompt)) => self.run("ai.generate", serde_json::json!({"prompt": prompt})),
+                Some(menus::BoxAction::Close) => {}
+                None => self.search = Some((text, at)),
+            }
+        }
+        if let Some(mut rows) = self.params_rows.take() {
+            let mut open = true;
+            let cmds = menus::parameters_window(ui, t, &mut rows, &mut open);
+            let changed = !cmds.is_empty();
+            for (id, p) in cmds {
+                self.run(&id, p);
+            }
+            if open {
+                // Refresh values after a change (keeps rows that are still being typed).
+                if changed {
+                    let fresh = menus::rows_from(&self.session);
+                    rows.retain(|r| !r.existing);
+                    rows.retain(|r| !fresh.iter().any(|f| f.name == r.name.trim()));
+                    let mut all = fresh;
+                    all.extend(rows);
+                    rows = all;
+                }
+                self.params_rows = Some(rows);
+            }
+        }
+    }
+
+    /// Hotkeys from the command registry (E, F, H, Q, Ctrl+S…), S for the shortcut box.
+    fn registry_shortcuts(&mut self, ui: &Ui) {
+        if ui.ctx().egui_wants_keyboard_input() || self.search.is_some() {
+            return;
+        }
+        if ui.input(|i| i.key_pressed(egui::Key::S) && i.modifiers.is_none()) {
+            let at =
+                ui.input(|i| i.pointer.hover_pos()).unwrap_or(ui.ctx().content_rect().center()) + Vec2::new(10.0, 10.0);
+            self.search = Some((String::new(), at));
+            return;
+        }
+        let in_sketch = self.sketch_mode.is_some();
+        let bindings: Vec<(String, String)> =
+            self.session.registry().specs().filter_map(|c| c.shortcut.clone().map(|k| (k, c.id.clone()))).collect();
+        for (key, id) in bindings {
+            let Some((mods, k)) = menus::parse_shortcut(&key) else { continue };
+            // In sketch mode the plain letters belong to the sketch tools.
+            if in_sketch && mods.is_none() {
+                continue;
+            }
+            if id == "doc.undo" || id == "doc.redo" {
+                continue; // handled with Ctrl+Y / Ctrl+Shift+Z
+            }
+            if ui.input_mut(|i| i.consume_key(mods, k)) {
+                if id == "doc.save" || id == "doc.open" {
+                    self.file_action(&id);
+                } else {
+                    self.run(&id, Value::Null);
                 }
             }
         }
@@ -592,6 +693,27 @@ impl FormCraftApp {
             "doc.new" => {
                 self.run(id, Value::Null);
                 self.doc_name = self.session.document().name.clone();
+            }
+            "doc.save" => {
+                if self.session.file().is_some() {
+                    self.run(id, serde_json::json!({}));
+                } else if let Some(path) = rfd::FileDialog::new()
+                    .set_title("Save")
+                    .add_filter("FormCraft design", &["fcraft"])
+                    .set_file_name(format!("{}.fcraft", self.session.document().name))
+                    .save_file()
+                {
+                    self.run(id, serde_json::json!({"path": path.to_string_lossy()}));
+                }
+            }
+            "doc.open" => {
+                if let Some(path) =
+                    rfd::FileDialog::new().set_title("Open").add_filter("FormCraft design", &["fcraft"]).pick_file()
+                {
+                    self.run(id, serde_json::json!({"path": path.to_string_lossy()}));
+                    self.doc_name = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+                    self.fit();
+                }
             }
             other => self.run(other, Value::Null),
         }
@@ -968,6 +1090,10 @@ impl FormCraftApp {
             self.layout.grid,
             self.layout.visual_style,
         );
+        if resp.secondary_clicked() && self.sketch_mode.as_ref().is_none_or(|m| m.idle()) {
+            self.marking = resp.interact_pointer_pos();
+            self.marking_fresh = true;
+        }
         if let Some(mut m) = self.sketch_mode.take() {
             let req = m.ui(ui, &resp, rect, &self.session, &self.camera, t);
             self.sketch_mode = Some(m);
@@ -1212,6 +1338,7 @@ impl FormCraftApp {
         if ui.ctx().egui_wants_keyboard_input() {
             return;
         }
+        self.registry_shortcuts(ui);
         let (undo, redo) = ui.input_mut(|i| {
             (
                 i.consume_key(egui::Modifiers::COMMAND, egui::Key::Z),
@@ -1290,6 +1417,7 @@ impl FormCraftApp {
         self.feature_dialog(ui, &t);
         self.rename_dialog(ui);
         self.plane_picker_ui(ui);
+        self.overlays(ui, &t);
         if self.sketch_mode.is_some() {
             self.sketch_palette(ui, &t);
         }

@@ -100,6 +100,11 @@ impl SketchMode {
         }
     }
 
+    /// No tool operation in progress (right-click may open the marking menu).
+    pub fn idle(&self) -> bool {
+        self.pending.is_empty() && self.dim_input.is_none()
+    }
+
     pub fn set_tool(&mut self, t: Tool) {
         self.tool = t;
         self.pending.clear();

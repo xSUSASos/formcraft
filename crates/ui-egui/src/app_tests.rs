@@ -229,3 +229,65 @@ fn drawing_in_sketch_mode() {
     assert_eq!(h.state_mut().session().model().bodies.len(), 1);
     assert!(h.state().sketch_mode.is_none());
 }
+
+fn key(h: &mut Harness<'_, FormCraftApp>, k: egui::Key, modifiers: Modifiers) {
+    h.event(Event::Key { key: k, physical_key: None, pressed: true, repeat: false, modifiers });
+    h.step();
+    h.event(Event::Key { key: k, physical_key: None, pressed: false, repeat: false, modifiers });
+    h.run_steps(2);
+}
+
+#[test]
+fn shortcut_box_runs_a_command() {
+    let mut h = harness();
+    h.event(Event::PointerMoved(canvas_point()));
+    key(&mut h, egui::Key::S, Modifiers::NONE);
+    assert!(h.state().search.is_some(), "S opens the shortcut box");
+    for c in "box".chars() {
+        h.event(Event::Text(c.to_string()));
+        h.step();
+    }
+    key(&mut h, egui::Key::Enter, Modifiers::NONE);
+    assert!(h.state().search.is_none());
+    let d = h.state().dialog.as_ref().map(|d| d.command.clone());
+    assert_eq!(d.as_deref(), Some("solid.box"), "Enter opens the Box dialog");
+}
+
+#[test]
+fn hotkey_opens_dialog_and_marking_menu_opens() {
+    let mut h = harness();
+    h.state_mut().session().execute("solid.box", &serde_json::json!({"size": [10, 10, 10]})).unwrap();
+    h.event(Event::PointerMoved(canvas_point()));
+    key(&mut h, egui::Key::F, Modifiers::NONE);
+    assert_eq!(h.state().dialog.as_ref().map(|d| d.command.as_str()), Some("solid.fillet"));
+    h.state_mut().dialog = None;
+    // right-click → marking menu
+    let p = canvas_point();
+    h.event(Event::PointerButton {
+        pos: p,
+        button: PointerButton::Secondary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
+    h.step();
+    h.event(Event::PointerButton {
+        pos: p,
+        button: PointerButton::Secondary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.run_steps(2);
+    assert!(h.state().marking.is_some());
+    key(&mut h, egui::Key::Escape, Modifiers::NONE);
+    assert!(h.state().marking.is_none());
+}
+
+#[test]
+fn parameters_window_edits_parameters() {
+    let mut h = harness();
+    h.state_mut().run("doc.parameters", Value::Null);
+    assert!(h.state().params_rows.is_some());
+    h.state_mut().run("doc.parameter", serde_json::json!({"name": "L", "expression": "60"}));
+    h.run_steps(2);
+    assert_eq!(h.state_mut().session().document().parameters.len(), 1);
+}
