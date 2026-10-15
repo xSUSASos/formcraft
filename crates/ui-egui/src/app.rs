@@ -17,13 +17,13 @@ use serde_json::Value;
 use crate::dialog::{FeatureDialog, Outcome};
 use crate::icons;
 use crate::layout::{Dock, Layout, VisualStyle};
-use crate::menus;
 use crate::sketch_mode::{Request, SketchMode, Tool};
 use crate::theme::{ThemeKind, Tokens};
 use crate::timeline;
 use crate::toolbar::{self, Action};
 use crate::viewcube::{self, CubeAction};
 use crate::viewport::Viewport;
+use crate::{manipulator, menus};
 
 const LAYOUT_KEY: &str = "formcraft.layout";
 const CAMERA_KEY: &str = "formcraft.camera";
@@ -1090,6 +1090,7 @@ impl FormCraftApp {
             self.layout.grid,
             self.layout.visual_style,
         );
+        self.manipulators(ui, rect, t);
         if resp.secondary_clicked() && self.sketch_mode.as_ref().is_none_or(|m| m.idle()) {
             self.marking = resp.interact_pointer_pos();
             self.marking_fresh = true;
@@ -1152,6 +1153,90 @@ impl FormCraftApp {
             FontId::proportional(12.0),
             t.text_dim,
         );
+    }
+
+    /// Manipulators for the open dialog (distance arrow, angle ring).
+    fn manipulators(&mut self, ui: &mut Ui, rect: Rect, t: &Tokens) {
+        let Some(dlg) = self.dialog.as_ref() else { return };
+        let cmd = dlg.command.clone();
+        let d = self.session.document();
+        let num = |text: Option<&str>| text.and_then(|x| d.eval(&formcraft_engine::doc::Expr(x.to_string())).ok());
+        // The sketch the dialog refers to (field or latest).
+        let sketch = || {
+            let id = dlg
+                .text("sketch")
+                .and_then(|x| x.parse::<u32>().ok())
+                .map(FeatureId)
+                .or_else(|| self.session.model().sketches.last().map(|s| s.id))?;
+            self.session.model().sketch(id)
+        };
+        match cmd.as_str() {
+            "solid.extrude" => {
+                let (Some(sk), Some(v)) = (sketch(), num(dlg.text("distance"))) else { return };
+                let Some(region) =
+                    formcraft_sketch::default_regions(&sk.regions).first().and_then(|i| sk.regions.get(*i))
+                else {
+                    return;
+                };
+                let origin = sk.plane.to_world(region.sample);
+                if let Some(nv) = manipulator::arrow(ui, rect, &self.camera, t, origin, sk.plane.normal, v) {
+                    if let Some(dl) = self.dialog.as_mut() {
+                        dl.set_text("distance", formcraft_engine::doc::expr::fmt_num(nv));
+                    }
+                }
+            }
+            "solid.press_pull" => {
+                let Some(v) = num(dlg.text("distance")) else { return };
+                let body = dlg
+                    .text("body")
+                    .and_then(|x| x.parse::<u32>().ok())
+                    .map(BodyId)
+                    .or_else(|| self.session.model().bodies.last().map(|b| b.id));
+                let face_text = dlg.text("face").unwrap_or("top").to_string();
+                let face: formcraft_engine::doc::FaceSel =
+                    serde_json::from_str(&face_text).unwrap_or(formcraft_engine::doc::FaceSel::Name(face_text.clone()));
+                let Some(b) = body.and_then(|b| self.session.model().body(b)) else { return };
+                let Ok(f) = formcraft_engine::regen::select::resolve_planar_face(
+                    self.session.kernel().as_ref(),
+                    &b.shape,
+                    &face,
+                ) else {
+                    return;
+                };
+                if let Some(nv) = manipulator::arrow(ui, rect, &self.camera, t, f.center, f.normal.normalize(), v) {
+                    if let Some(dl) = self.dialog.as_mut() {
+                        dl.set_text("distance", formcraft_engine::doc::expr::fmt_num(nv));
+                    }
+                }
+            }
+            "solid.revolve" => {
+                let (Some(sk), Some(deg)) = (sketch(), num(dlg.text("angle")).or(Some(360.0))) else { return };
+                let axis = match dlg.text("axis").unwrap_or("Z") {
+                    "X" | "x" => DVec3::X,
+                    "Y" | "y" => DVec3::Y,
+                    _ => DVec3::Z,
+                };
+                let Some(region) = sk.regions.first() else { return };
+                let start = sk.plane.to_world(region.sample);
+                let r = (start - axis * start.dot(axis)).length();
+                if let Some(nv) = manipulator::ring(
+                    ui,
+                    rect,
+                    &self.camera,
+                    t,
+                    DVec3::ZERO + axis * start.dot(axis),
+                    axis,
+                    r,
+                    start,
+                    deg,
+                ) {
+                    if let Some(dl) = self.dialog.as_mut() {
+                        dl.set_text("angle", formcraft_engine::doc::expr::fmt_num(nv));
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 
     /// Hover pre-selection and click selection on the canvas (Ctrl/Shift adds/removes).

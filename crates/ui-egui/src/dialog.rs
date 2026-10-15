@@ -161,6 +161,16 @@ impl FeatureDialog {
         })
     }
 
+    pub fn text(&self, key: &str) -> Option<&str> {
+        self.fields.iter().find(|f| f.key == key).map(|f| f.text.as_str())
+    }
+
+    pub fn set_text(&mut self, key: &str, v: String) {
+        if let Some(f) = self.fields.iter_mut().find(|f| f.key == key) {
+            f.text = v;
+        }
+    }
+
     /// Params JSON from the fields (empty optional fields are omitted).
     pub fn params(&self) -> Result<Value, String> {
         let mut m = Map::new();
@@ -356,6 +366,9 @@ impl FeatureDialog {
 /// Numbers stay numbers; anything else is an expression string.
 fn num_or_expr(s: &str) -> Value {
     let t = s.trim();
+    if let Ok(i) = t.parse::<i64>() {
+        return json!(i); // ids (bodies, sketches) must stay integers
+    }
     match t.parse::<f64>() {
         Ok(v) if v.is_finite() => json!(v),
         _ => json!(t),
@@ -374,7 +387,7 @@ mod tests {
         assert_eq!(d.fields[0].key, "radius", "required first");
         let (cmd, p) = d.invocation().unwrap();
         assert_eq!(cmd, "solid.fillet");
-        assert_eq!(p["radius"], 2.0);
+        assert_eq!(p["radius"], 2);
         assert_eq!(p["edges"], "vertical");
         assert!(s.execute(&cmd, &p).is_ok());
 
@@ -398,6 +411,26 @@ mod tests {
         }
         let (cmd, p) = d.invocation().unwrap();
         assert_eq!(cmd, "feature.edit");
-        assert_eq!(p["params"]["size"], json!([10.0, 10.0, "L/2"]));
+        assert_eq!(p["params"]["size"], json!([10, 10, "L/2"]));
+    }
+}
+
+#[cfg(test)]
+mod edit_tests {
+    use super::*;
+
+    #[test]
+    fn editing_an_extrude_from_the_dialog_works() {
+        let mut s = Session::new();
+        s.execute("sketch.create", &json!({"rectangles": [{"corner": [0, 0], "size": [20, 10]}]})).unwrap();
+        let r = s.execute("solid.extrude", &json!({"distance": 4})).unwrap();
+        let id = FeatureId(r["feature"].as_u64().unwrap() as u32);
+        let p = s.execute("feature.params", &json!({"feature": id.0})).unwrap();
+        let mut d = FeatureDialog::new(&s, "solid.extrude", &p["params"], Some(id)).unwrap();
+        d.set_text("distance", "9".into());
+        let (cmd, params) = d.invocation().unwrap();
+        s.execute(&cmd, &params).unwrap();
+        let v = s.execute("model.inspect", &json!({})).unwrap();
+        assert_eq!(v["bodies"][0]["bbox"]["size"][2], 9.0);
     }
 }

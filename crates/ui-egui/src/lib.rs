@@ -13,6 +13,7 @@ mod app;
 mod dialog;
 pub mod icons;
 pub mod layout;
+mod manipulator;
 mod menus;
 mod sketch_mode;
 pub mod theme;

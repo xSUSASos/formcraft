@@ -68,12 +68,18 @@ pub fn opt_bool(p: &Value, key: &str) -> Result<Option<bool>> {
     }
 }
 
+/// A non-negative integer id; integral floats (`1.0`, as some clients send) are accepted.
+pub fn as_id(v: &Value) -> Option<u32> {
+    v.as_u64()
+        .or_else(|| v.as_f64().filter(|f| f.fract() == 0.0 && *f >= 0.0 && *f <= u32::MAX as f64).map(|f| f as u64))
+        .and_then(|i| u32::try_from(i).ok())
+}
+
 /// A body by numeric id or by name.
 pub fn body_ref(d: &Document, v: &Value, key: &str) -> Result<BodyId> {
     match v {
-        Value::Number(n) => {
-            let id =
-                n.as_u64().and_then(|i| u32::try_from(i).ok()).ok_or_else(|| bad(format!("`{key}`: bad body id")))?;
+        Value::Number(_) => {
+            let id = as_id(v).ok_or_else(|| bad(format!("`{key}`: bad body id")))?;
             d.bodies
                 .contains_key(&BodyId(id))
                 .then_some(BodyId(id))
@@ -96,12 +102,8 @@ pub fn body(d: &Document, p: &Value, key: &str) -> Result<BodyId> {
 /// A feature by numeric id or by timeline name.
 pub fn feature(d: &Document, p: &Value, key: &str) -> Result<FeatureId> {
     match p.get(key) {
-        Some(Value::Number(n)) => {
-            let id = n
-                .as_u64()
-                .and_then(|i| u32::try_from(i).ok())
-                .map(FeatureId)
-                .ok_or_else(|| bad(format!("`{key}`: bad id")))?;
+        Some(v @ Value::Number(_)) => {
+            let id = as_id(v).map(FeatureId).ok_or_else(|| bad(format!("`{key}`: bad id")))?;
             d.feature(id).map(|f| f.id).ok_or_else(|| bad(format!("`{key}`: no feature {}", id.0)))
         }
         Some(Value::String(s)) => d
