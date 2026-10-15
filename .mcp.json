@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "formcraft": {
+      "command": "target/debug/formcraft-cli.exe",
+      "args": ["mcp"]
+    }
+  }
+}

@@ -1,7 +1,9 @@
 //! FormCraft desktop app.
 //!
 //! `formcraft [--screenshot out.png] [--fresh-layout] [--theme dark|light] [--float-browser]
-//!  [--text-commands] [--view top|front|right|home]`
+//!  [--text-commands] [--view top|front|right|home] [--control PORT]`
+//!
+//! `--control PORT` serves the loopback control channel for `formcraft-cli mcp --port PORT`.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::process::ExitCode;
@@ -27,6 +29,13 @@ fn main() -> ExitCode {
             "--dialog" => opts.dialog = args.next(),
             "--edit" => opts.edit = args.next(),
             "--overlay" => opts.overlay = args.next(),
+            "--control" => match args.next().and_then(|p| p.parse::<u16>().ok()) {
+                Some(p) => opts.control = Some(p),
+                None => {
+                    eprintln!("--control needs a port number");
+                    return ExitCode::FAILURE;
+                }
+            },
             "--theme" => {
                 opts.theme = match args.next().as_deref() {
                     Some("light") => Some(ThemeKind::Light),

@@ -9,6 +9,7 @@
 )]
 
 pub mod camera;
+pub mod control;
 pub mod gpu;
 pub mod grid;
 pub mod headless;

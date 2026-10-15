@@ -5,8 +5,8 @@
 
 ## Сейчас
 - **Фаза:** 4 — Команды, CLI, MCP (в работе). Фаза 3 закрыта, тег phase-3.
-- **Сделано в фазе 4:** шаги 1–3 — `render::headless` (PNG), CLI `convert`/`render`/`mcp [--port N]`, крейт `mcp` (stdio JSON-RPC, инструменты execute/list_commands/inspect_model/render/list_selectors/run_script/new_design; screenshot/ui_click для Remote). Тесты mcp 5/5, CI зелёный.
-- **Следующий шаг:** 4 — control channel в приложении (`formcraft --control PORT`: engine.execute, model.inspect, ui.render, ui.screenshot, ui.click; бэкенд Remote уже ждёт этот протокол в `crates/mcp/src/backend.rs`), затем 5–7.
+- **Сделано в фазе 4:** шаги 1–5 — `render::headless` (PNG), CLI `convert`/`render`/`mcp [--port N]`, крейт `mcp` (stdio JSON-RPC, инструменты execute/list_commands/inspect_model/render/list_selectors/run_script/new_design; screenshot/ui_click для Remote). Control channel `formcraft --control PORT` (`crates/ui-egui/src/control.rs`; общие методы сессии в `render::control`), `.mcp.json`. Кронштейн собран через MCP в живом окне (`docs/images/phase4-mcp-remote.png`). CI зелёный.
+- **Следующий шаг:** 6 — ADR 0003 «Plugin API v1» (WIT), затем 7.
 - **План фазы 4:**
   1. `render::headless`: PNG тел (headless wgpu) — для `formcraft-cli render` и MCP `render`.
   2. CLI: `convert` (STEP→STL/STEP), `render`, `mcp`.
@@ -31,7 +31,7 @@
 | 1 Каркас и оболочка UI | готово | phase-1 |
 | 2 Тело на экране | готово | phase-2 |
 | 3 Эскиз, фичи, таймлайн | готово | phase-3 |
-| 4 Команды, CLI, MCP | в работе (шаги 1–3) | — |
+| 4 Команды, CLI, MCP | в работе (шаги 1–5) | — |
 | 5 Встроенный ИИ | — | — |
 | 6 Плагины и скрипты | — | — |
 | 7 Шлифовка и релиз | — | — |
@@ -57,6 +57,11 @@
 - Фичи: `crates/regen/src/tests3.rs` 12 golden-тестов (эскиз+выдавливание, симметрия, through all, revolve, fillet при смене параметров, chamfer, shell, цековка, зенковка, press pull, эскиз на грани, сигнатура грани).
 - UI: скриншоты `docs/images/phase3-*.png` (режим эскиза, диалог+таймлайн, marking menu, манипулятор). Сравнение с п. 2: feature dialog справа ✓, манипуляторы ✓, marking menu ✓, S-box ✓, sketch palette ✓, таймлайн с иконками/маркером/ошибками ✓.
 - `.fcraft`: тест `save_and_open_round_trip`.
+
+## Приёмка Фазы 4 (собирается)
+- MCP по stdio, headless: `cargo test -p formcraft-mcp` — 5 passed (жизненный цикл, кронштейн через run_script + inspect_model с точным объёмом, render → PNG, ошибки протокола).
+- Живое приложение: `formcraft --control 7878` + `formcraft-cli mcp --port 7878` ← JSON-RPC из файла: run_script (кронштейн) → inspect_model (bbox 60×40×5) → ui_click {world 30,30,5} → `"hit": true, "Selected: face 4 of Body1"` → screenshot (1440×900, `docs/images/phase4-mcp-remote.png`) → render (640×480). Тест `control_channel_drives_the_app` — то же по TCP в CI.
+- `.mcp.json` в корне: `target/debug/formcraft-cli.exe mcp` (новая сессия Claude Code подхватит после одобрения).
 
 ## Журнал
 - 2026-10-14: репозиторий, PLAN, PROGRESS; Rust; изучен `../cadcraft-ref`.

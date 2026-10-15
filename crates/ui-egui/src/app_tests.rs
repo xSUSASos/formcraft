@@ -356,3 +356,54 @@ fn acceptance_bracket_with_the_mouse() {
     let names: Vec<String> = h.state().session.document().features.iter().map(|f| f.name.clone()).collect();
     assert_eq!(names, vec!["Sketch1", "Extrude1", "Fillet1"]);
 }
+
+/// Control channel end to end: a TCP client builds a part in the running UI, inspects it and
+/// clicks the canvas; requests are served on the UI thread between frames.
+#[test]
+fn control_channel_drives_the_app() {
+    use std::io::{BufRead, BufReader, Write};
+
+    let mut h = harness();
+    let (rx, port) = crate::control::listen(0, || {}).expect("bind");
+    h.state_mut().attach_control(rx);
+    let client = std::thread::spawn(move || {
+        let s = std::net::TcpStream::connect(("127.0.0.1", port)).expect("connect");
+        let mut r = BufReader::new(s.try_clone().expect("clone"));
+        let mut w = s;
+        let mut call = |id: u64, line: String| -> serde_json::Value {
+            writeln!(w, "{line}").expect("write");
+            let mut out = String::new();
+            r.read_line(&mut out).expect("read");
+            let v: serde_json::Value = serde_json::from_str(&out).expect("json");
+            assert_eq!(v["id"], id);
+            v
+        };
+        let box_ = call(
+            1,
+            r#"{"id":1,"method":"engine.execute","params":{"command":"solid.box","params":{"size":[40,30,10]}}}"#
+                .into(),
+        );
+        assert!(box_["result"].is_object(), "{box_}");
+        let m = call(2, r#"{"id":2,"method":"model.inspect"}"#.into());
+        let vol = m["result"]["bodies"][0]["volume"].as_f64().unwrap_or(0.0);
+        assert!((vol - 12000.0).abs() < 1e-6, "{m}");
+        // the top face centre, projected through the app's camera
+        let click = call(3, r#"{"id":3,"method":"ui.click","params":{"x":20,"y":15,"z":10,"space":"world"}}"#.into());
+        assert_eq!(click["result"]["hit"], true, "{click}");
+        let bad = call(4, r#"{"id":4,"method":"ui.click","params":{"x":"nan","y":1}}"#.into());
+        assert!(bad["error"].is_string(), "{bad}");
+        let unknown = call(5, r#"{"id":5,"method":"teleport"}"#.into());
+        assert!(unknown["error"].is_string());
+        writeln!(w, "not json").expect("write");
+        let mut out = String::new();
+        r.read_line(&mut out).expect("read");
+        assert!(out.contains("parse error"));
+    });
+    let start = std::time::Instant::now();
+    while !client.is_finished() && start.elapsed() < std::time::Duration::from_secs(60) {
+        h.step();
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    client.join().expect("client assertions");
+    assert!(h.state().selection_summary().starts_with("Selected: face"), "{}", h.state().selection_summary());
+}

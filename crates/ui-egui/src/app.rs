@@ -12,8 +12,9 @@ use formcraft_engine::{Pick, Session};
 use formcraft_render::camera::{Camera, Projection};
 use formcraft_render::grid::{self, LineKind};
 use glam::{DVec2, DVec3};
-use serde_json::Value;
+use serde_json::{Value, json};
 
+use crate::control;
 use crate::dialog::{FeatureDialog, Outcome};
 use crate::icons;
 use crate::layout::{Dock, Layout, VisualStyle};
@@ -51,6 +52,8 @@ pub struct AppOptions {
     pub edit: Option<String>,
     /// Open an overlay at startup (screenshots): marking, search, parameters.
     pub overlay: Option<String>,
+    /// Serve the loopback control channel on this port (`formcraft-cli mcp --port`).
+    pub control: Option<u16>,
 }
 
 /// Browser tree visibility toggles (Origin and bodies get real items in Phase 2).
@@ -107,6 +110,19 @@ pub struct FormCraftApp {
     search: Option<(String, Pos2)>,
     params_rows: Option<Vec<menus::ParamRow>>,
     last_command: Option<String>,
+    /// Control channel requests (`--control PORT`).
+    control: Option<std::sync::mpsc::Receiver<control::Request>>,
+    /// Offscreen renderer for `ui.render`, created on first use.
+    control_renderer: Option<Result<formcraft_render::gpu::Renderer, String>>,
+    /// `ui.screenshot` requests waiting for the next frame's pixels.
+    pending_shots: Vec<(control::Reply, Option<PathBuf>)>,
+}
+
+/// Marks screenshots requested through the control channel.
+struct ControlShot;
+
+fn is_control_shot(u: &egui::UserData) -> bool {
+    u.data.as_ref().is_some_and(|d| d.downcast_ref::<ControlShot>().is_some())
 }
 
 impl FormCraftApp {
@@ -129,6 +145,16 @@ impl FormCraftApp {
         }
         let mut app = Self::with_state(layout, camera, options);
         app.viewport = Viewport::new(cc.wgpu_render_state.clone());
+        if let Some(port) = app.options.control {
+            let ctx = cc.egui_ctx.clone();
+            match control::listen(port, move || ctx.request_repaint()) {
+                Ok((rx, bound)) => {
+                    app.control = Some(rx);
+                    app.status = format!("Control channel on 127.0.0.1:{bound}");
+                }
+                Err(e) => app.status = e,
+            }
+        }
         app
     }
 
@@ -168,6 +194,9 @@ impl FormCraftApp {
             search: None,
             params_rows: None,
             last_command: None,
+            control: None,
+            control_renderer: None,
+            pending_shots: Vec::new(),
         };
         if let Some(path) = app.options.script.clone() {
             app.run_script_file(&path);
@@ -218,6 +247,139 @@ impl FormCraftApp {
     fn fit_keep_direction(&mut self) {
         if !self.session.model().bodies.is_empty() {
             self.fit();
+        }
+    }
+
+    /// Serve control channel requests from `rx` (the app does this for `--control`; tests too).
+    pub fn attach_control(&mut self, rx: std::sync::mpsc::Receiver<control::Request>) {
+        self.control = Some(rx);
+    }
+
+    /// Execute queued control channel requests on the UI thread.
+    fn serve_control(&mut self, ui: &Ui) {
+        let Some(rx) = self.control.as_ref() else { return };
+        let requests: Vec<control::Request> = rx.try_iter().collect();
+        for r in requests {
+            if r.method == "ui.screenshot" {
+                let path = r.params.get("path").and_then(Value::as_str).map(PathBuf::from);
+                self.pending_shots.push((r.reply, path));
+                ui.ctx().send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(ControlShot)));
+                continue;
+            }
+            let out = self.control_call(&r.method, r.params, ui.ctx().pixels_per_point());
+            let _ = r.reply.send(out);
+        }
+        if self.pending_shots.is_empty() {
+            return;
+        }
+        let image = ui.input(|i| {
+            i.events.iter().find_map(|e| match e {
+                egui::Event::Screenshot { image, user_data, .. } if is_control_shot(user_data) => Some(image.clone()),
+                _ => None,
+            })
+        });
+        match image {
+            Some(img) => {
+                let [w, h] = img.size;
+                let rgba: Vec<u8> = img.pixels.iter().flat_map(|p| p.to_array()).collect();
+                let png = formcraft_render::encode_png(&rgba, w as u32, h as u32);
+                for (reply, path) in self.pending_shots.drain(..) {
+                    let out = png.clone().and_then(|png| {
+                        if let Some(p) = &path {
+                            std::fs::write(p, &png).map_err(|e| format!("{}: {e}", p.display()))?;
+                        }
+                        Ok(json!({"pngBase64": formcraft_render::control::base64(&png), "width": w, "height": h}))
+                    });
+                    let _ = reply.send(out);
+                }
+            }
+            None => ui.ctx().request_repaint(),
+        }
+    }
+
+    /// One control method (everything except `ui.screenshot`, which needs a frame).
+    pub fn control_call(&mut self, method: &str, params: Value, pixels_per_point: f32) -> Result<Value, String> {
+        match method {
+            "ui.click" => return self.control_click(&params, pixels_per_point),
+            "ui.state" => {
+                let r = self.canvas_rect;
+                let k = pixels_per_point;
+                return Ok(json!({
+                    "status": self.status,
+                    "canvas": [r.left() * k, r.top() * k, r.width() * k, r.height() * k],
+                    "pixelsPerPoint": k,
+                    "sketchMode": self.sketch_mode.is_some(),
+                    "dialog": self.dialog.is_some(),
+                    "selection": self.selection_summary(),
+                }));
+            }
+            _ => {}
+        }
+        let was_empty = self.session.model().bodies.is_empty();
+        let out =
+            formcraft_render::control::session_call(&mut self.session, &mut self.control_renderer, method, params);
+        if method == "engine.execute" {
+            self.status = match &out {
+                Ok(v) => v.get("message").and_then(Value::as_str).unwrap_or("done").to_string(),
+                Err(e) => e.clone(),
+            };
+            if was_empty && !self.session.model().bodies.is_empty() {
+                self.fit();
+            }
+        }
+        out
+    }
+
+    /// `ui.click {x, y, z?, space: screen|world, button: left|right}`. Screen coordinates are
+    /// window pixels as in `ui.screenshot`. A left click selects what is under the cursor (like
+    /// a mouse click in Select mode); a right click opens the marking menu there.
+    fn control_click(&mut self, p: &Value, ppp: f32) -> Result<Value, String> {
+        let num = |k: &str| match p.get(k) {
+            None => Ok(None),
+            Some(v) => v.as_f64().filter(|x| x.is_finite()).map(Some).ok_or(format!("`{k}` must be a finite number")),
+        };
+        let (x, y) = (num("x")?.ok_or("missing `x`")?, num("y")?.ok_or("missing `y`")?);
+        let rect = self.canvas_rect;
+        if !rect.is_positive() {
+            return Err("the canvas has not been drawn yet".into());
+        }
+        let size = DVec2::new(rect.width() as f64, rect.height() as f64);
+        let local = match p.get("space").and_then(Value::as_str).unwrap_or("screen") {
+            "screen" => {
+                let ppp = f64::from(ppp.max(0.1));
+                let at = DVec2::new(x / ppp - rect.left() as f64, y / ppp - rect.top() as f64);
+                if at.x < 0.0 || at.y < 0.0 || at.x > size.x || at.y > size.y {
+                    return Err(format!("({x}, {y}) is outside the canvas"));
+                }
+                at
+            }
+            "world" => {
+                let z = num("z")?.unwrap_or(0.0);
+                self.camera.project(DVec3::new(x, y, z), size).ok_or("the point is behind the camera")?
+            }
+            other => return Err(format!("unknown space `{other}` (screen, world)")),
+        };
+        match p.get("button").and_then(Value::as_str).unwrap_or("left") {
+            "left" => {
+                if self.sketch_mode.is_some() {
+                    return Err("in sketch mode: add geometry with sketch.edit / sketch.create".into());
+                }
+                let hit = self.viewport.pick(&self.camera, local, size, &self.session);
+                let found = hit.is_some();
+                let sel = self.session.selection_mut();
+                match hit {
+                    Some(h) => sel.set(h),
+                    None => sel.clear(),
+                }
+                self.status = self.selection_summary();
+                Ok(json!({"hit": found, "selection": self.status, "canvasPoint": [local.x, local.y]}))
+            }
+            "right" => {
+                self.marking = Some(rect.min + Vec2::new(local.x as f32, local.y as f32));
+                self.marking_fresh = true;
+                Ok(json!({"opened": "marking menu"}))
+            }
+            other => Err(format!("unknown button `{other}` (left, right)")),
         }
     }
 
@@ -1492,7 +1654,7 @@ impl FormCraftApp {
         }
         let image = ui.input(|i| {
             i.events.iter().find_map(|e| match e {
-                egui::Event::Screenshot { image, .. } => Some(image.clone()),
+                egui::Event::Screenshot { image, user_data, .. } if !is_control_shot(user_data) => Some(image.clone()),
                 _ => None,
             })
         });
@@ -1509,6 +1671,7 @@ impl FormCraftApp {
     pub fn draw(&mut self, ui: &mut Ui) {
         let t = self.tokens();
         ui.ctx().set_visuals(t.visuals());
+        self.serve_control(ui);
         self.shortcuts(ui);
         self.app_bar(ui, &t);
         self.toolbar(ui, &t);

@@ -10,6 +10,7 @@
 )]
 
 mod app;
+pub mod control;
 mod dialog;
 pub mod icons;
 pub mod layout;

@@ -13,6 +13,8 @@ workspace = true
 [dependencies]
 formcraft-kernel = { workspace = true }
 formcraft-tess = { workspace = true }
+formcraft-engine = { workspace = true }
+serde_json = { workspace = true }
 glam = { workspace = true }
 serde = { workspace = true }
 bytemuck = { workspace = true }
