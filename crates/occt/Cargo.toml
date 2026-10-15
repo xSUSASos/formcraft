@@ -1,0 +1,32 @@
+[package]
+name = "formcraft-occt"
+description = "OpenCascade implementation of the FormCraft Kernel trait (own cxx bridge, every C++ call guarded)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints.clippy]
+type_complexity = "allow"
+too_many_arguments = "allow"
+dbg_macro = "warn"
+todo = "warn"
+
+[dependencies]
+formcraft-kernel = { workspace = true }
+cxx = { workspace = true }
+glam = { workspace = true }
+log = { workspace = true }
+
+
+[build-dependencies]
+cxx-build = { workspace = true }
+occt-sys = { workspace = true }
+
+[[test]]
+name = "step"
+harness = false
+
+[dev-dependencies]
+formcraft-kernel = { workspace = true }

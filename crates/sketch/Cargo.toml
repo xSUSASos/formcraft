@@ -1,0 +1,16 @@
+[package]
+name = "formcraft-sketch"
+description = "2D sketches and the geometric constraint solver"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+formcraft-kernel = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }

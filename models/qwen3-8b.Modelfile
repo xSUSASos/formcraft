@@ -1,0 +1,11 @@
+# Local build of qwen3:8b (Q4_K_M) from the official Qwen GGUF (Apache-2.0).
+# ollama create qwen3:8b -f models/qwen3-8b.Modelfile
+FROM C:/fc-models/qwen3-8b-q4_k_m.gguf
+TEMPLATE """{{- if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}{{- range .Messages }}<|im_start|>{{ .Role }}
+{{ .Content }}<|im_end|>
+{{ end }}<|im_start|>assistant
+"""
+PARAMETER stop "<|im_end|>"
+PARAMETER num_ctx 8192

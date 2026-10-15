@@ -1,0 +1,18 @@
+[package]
+name = "formcraft-render"
+description = "3D rendering of bodies, edges, previews and manipulators"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+formcraft-kernel = { workspace = true }
+formcraft-tess = { workspace = true }
+glam = { workspace = true }
+serde = { workspace = true }
+bytemuck = { workspace = true }

@@ -1,0 +1,18 @@
+[package]
+name = "formcraft-regen"
+description = "Regeneration of the feature timeline into B-rep bodies with per-feature errors"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+formcraft-kernel = { workspace = true }
+formcraft-sketch = { workspace = true }
+formcraft-doc = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }

@@ -1,0 +1,6 @@
+[alias]
+xtask = "run --package xtask --"
+
+[env]
+# CMake 4 refuses OCCT's old cmake_minimum_required (docs/adr/0001-geometry-kernel.md).
+CMAKE_POLICY_VERSION_MINIMUM = "3.5"

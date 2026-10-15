@@ -1,0 +1,17 @@
+[package]
+name = "formcraft-mcp"
+description = "MCP server (JSON-RPC 2.0 over stdio) on top of the engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+formcraft-engine = { workspace = true }
+formcraft-render = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }

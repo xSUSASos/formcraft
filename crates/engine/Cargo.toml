@@ -1,0 +1,24 @@
+[package]
+name = "formcraft-engine"
+description = "Session, command registry (every action is a command with a JSON schema), selection, undo"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+formcraft-kernel = { workspace = true }
+formcraft-occt = { workspace = true }
+formcraft-sketch = { workspace = true }
+formcraft-doc = { workspace = true }
+formcraft-regen = { workspace = true }
+formcraft-tess = { workspace = true }
+formcraft-io = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }

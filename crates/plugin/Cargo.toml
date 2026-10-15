@@ -1,0 +1,19 @@
+[package]
+name = "formcraft-plugin"
+description = "WebAssembly plugin host: manifests, permissions, limits, custom features"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+formcraft-engine = { workspace = true }
+formcraft-plugin-api = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }

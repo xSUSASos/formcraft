@@ -1,0 +1,16 @@
+[package]
+name = "formcraft-kernel"
+description = "Geometry kernel abstraction: the Kernel trait, shapes, topology queries and meshes"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+glam = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
