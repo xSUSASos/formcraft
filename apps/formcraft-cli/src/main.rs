@@ -27,6 +27,8 @@ usage:
   formcraft-cli convert <in.step|in.fcraft|script.fcs> <out.step|out.stl>
   formcraft-cli render <in.fcraft|script.fcs|in.step> <out.png> [--view iso|top|front|right|…] [--size WxH]
   formcraft-cli mcp [--port N]     MCP server on stdio (headless, or attached to `formcraft --control N`)
+  formcraft-cli screenshot <scene|all> <out.png|dir> [--theme light|dark|both] [--size WxH]
+                                   offscreen UI screenshots (UI_SPEC.md §8 scenes; default 1920x1080, both themes)
   formcraft-cli ai \"<request>\" [--save <out.step|out.stl|out.fcraft>] [--plan-only]
                                    build a part with the local LLM (FORMCRAFT_AI_MODEL, FORMCRAFT_AI_URL)
 
@@ -53,6 +55,7 @@ fn main() -> ExitCode {
         Some("render") => render(&args[1..]),
         Some("mcp") => mcp(&args[1..]),
         Some("ai") => ai(&args[1..]),
+        Some("screenshot") => screenshot(&args[1..]),
         Some("-h" | "--help" | "help") | None => {
             print!("{USAGE}");
             Ok(())
@@ -115,6 +118,54 @@ fn run(args: &[String]) -> Result<(), String> {
     }
     let report = session.execute("model.inspect", &json!({})).map_err(|e| e.to_string())?;
     println!("{}", serde_json::to_string_pretty(&report).unwrap_or_default());
+    Ok(())
+}
+
+fn screenshot(args: &[String]) -> Result<(), String> {
+    use formcraft_ui_egui::screens;
+    use formcraft_ui_egui::theme::ThemeKind;
+    let (mut pos, mut themes, mut size) = (Vec::new(), vec![ThemeKind::Light, ThemeKind::Dark], [1920u32, 1080]);
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "--theme" => {
+                themes = match it.next().map(String::as_str) {
+                    Some("light") => vec![ThemeKind::Light],
+                    Some("dark") => vec![ThemeKind::Dark],
+                    Some("both") => vec![ThemeKind::Light, ThemeKind::Dark],
+                    _ => return Err("--theme light|dark|both".into()),
+                }
+            }
+            "--size" => {
+                let v = it.next().ok_or("--size WxH")?;
+                let (w, h) = v.split_once('x').ok_or("--size WxH")?;
+                size = [
+                    w.parse::<u32>().map_err(|e| e.to_string())?.clamp(320, 7680),
+                    h.parse::<u32>().map_err(|e| e.to_string())?.clamp(240, 4320),
+                ];
+            }
+            p => pos.push(p.to_string()),
+        }
+    }
+    let (scene, out) = match pos.as_slice() {
+        [s, o] => (s.clone(), PathBuf::from(o)),
+        _ => return Err("screenshot needs <scene|all> <out>".into()),
+    };
+    let scenes: Vec<&str> =
+        if scene == "all" { screens::SCENES.iter().map(|(s, _)| *s).collect() } else { vec![scene.as_str()] };
+    let many = scenes.len() > 1 || themes.len() > 1;
+    if many {
+        std::fs::create_dir_all(&out).map_err(|e| format!("{}: {e}", out.display()))?;
+    }
+    for s in &scenes {
+        for t in &themes {
+            let img = screens::render(s, *t, size)?;
+            let name = format!("{s}-{}.png", if *t == ThemeKind::Light { "light" } else { "dark" });
+            let path = if many { out.join(name) } else { out.clone() };
+            img.save(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+            eprintln!("{}", path.display());
+        }
+    }
     Ok(())
 }
 

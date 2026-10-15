@@ -16,6 +16,7 @@ pub mod icons;
 pub mod layout;
 mod manipulator;
 mod menus;
+pub mod screens;
 mod sketch_mode;
 pub mod theme;
 mod timeline;

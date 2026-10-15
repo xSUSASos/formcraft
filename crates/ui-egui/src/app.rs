@@ -159,7 +159,24 @@ impl FormCraftApp {
     }
 
     /// App without eframe storage (tests and headless use).
-    pub fn with_state(mut layout: Layout, camera: Camera, options: AppOptions) -> Self {
+    pub fn with_state(layout: Layout, camera: Camera, options: AppOptions) -> Self {
+        let mut session = Session::new();
+        let ai_status = match formcraft_ai::install(&mut session, &formcraft_ai::AiConfig::from_env()) {
+            Ok(_) => None,
+            Err(e) => Some(format!("Assistant unavailable: {e}")),
+        };
+        let mut app = Self::with_state_and_session(layout, camera, options, session);
+        if let Some(s) = ai_status {
+            app.status = s;
+        }
+        app
+    }
+
+    /// App on an existing session (its document, commands and assistant are kept).
+    pub fn with_state_and_session(mut layout: Layout, camera: Camera, options: AppOptions, session: Session) -> Self {
+        if let Some(t) = options.theme {
+            layout.theme = t;
+        }
         if options.float_browser {
             layout.browser.dock = Dock::Floating;
         }
@@ -167,11 +184,6 @@ impl FormCraftApp {
             layout.text_commands.open = true;
         }
         let view = options.view.clone();
-        let mut session = Session::new();
-        let ai_status = match formcraft_ai::install(&mut session, &formcraft_ai::AiConfig::from_env()) {
-            Ok(_) => None,
-            Err(e) => Some(format!("Assistant unavailable: {e}")),
-        };
         let mut app = FormCraftApp {
             session,
             layout,
@@ -203,9 +215,6 @@ impl FormCraftApp {
             control_renderer: None,
             pending_shots: Vec::new(),
         };
-        if let Some(s) = ai_status {
-            app.status = s;
-        }
         if let Some(path) = app.options.script.clone() {
             app.run_script_file(&path);
             if view.is_none() {
@@ -222,6 +231,9 @@ impl FormCraftApp {
         match app.options.overlay.as_deref() {
             Some("marking") => app.marking = Some(Pos2::new(760.0, 420.0)),
             Some("search") => app.search = Some(("fil".into(), Pos2::new(700.0, 300.0))),
+            Some(o) if o.starts_with("search:") => {
+                app.search = Some((o.trim_start_matches("search:").to_string(), Pos2::new(700.0, 300.0)));
+            }
             Some("parameters") => app.params_rows = Some(menus::rows_from(&app.session)),
             _ => {}
         }
@@ -256,6 +268,16 @@ impl FormCraftApp {
         if !self.session.model().bodies.is_empty() {
             self.fit();
         }
+    }
+
+    /// Draw the 3D view with this wgpu device (offscreen screenshots).
+    pub(crate) fn set_render_state(&mut self, rs: egui_wgpu::RenderState) {
+        self.viewport = Viewport::new(Some(rs));
+    }
+
+    /// Frame the visible bodies (screenshots).
+    pub(crate) fn fit_view(&mut self) {
+        self.fit();
     }
 
     /// Serve control channel requests from `rx` (the app does this for `--control`; tests too).
@@ -389,6 +411,16 @@ impl FormCraftApp {
             }
             other => Err(format!("unknown button `{other}` (left, right)")),
         }
+    }
+
+    /// Move the session out (the app is left with an empty one).
+    pub fn take_session(&mut self) -> Session {
+        std::mem::take(&mut self.session)
+    }
+
+    /// Canvas rectangle of the last frame (points).
+    pub fn canvas_rect(&self) -> Rect {
+        self.canvas_rect
     }
 
     pub fn session(&mut self) -> &mut Session {

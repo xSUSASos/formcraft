@@ -407,3 +407,19 @@ fn control_channel_drives_the_app() {
     client.join().expect("client assertions");
     assert!(h.state().selection_summary().starts_with("Selected: face"), "{}", h.state().selection_summary());
 }
+
+/// UI_SPEC.md §8: every acceptance scene renders offscreen (skipped without a GPU adapter).
+#[test]
+fn every_spec_scene_renders() {
+    for (scene, _) in crate::screens::SCENES {
+        match crate::screens::render(scene, crate::theme::ThemeKind::Light, [960, 540]) {
+            Ok(img) => {
+                assert_eq!((img.width(), img.height()), (960, 540), "{scene}");
+                let distinct: std::collections::HashSet<[u8; 4]> = img.pixels().step_by(97).map(|p| p.0).collect();
+                assert!(distinct.len() > 20, "{scene}: image looks empty");
+            }
+            Err(e) if e.contains("no GPU adapter") => return,
+            Err(e) => panic!("{scene}: {e}"),
+        }
+    }
+}
