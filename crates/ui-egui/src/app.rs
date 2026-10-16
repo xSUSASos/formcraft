@@ -649,6 +649,10 @@ impl FormCraftApp {
                     self.marking = None;
                     self.run(&id, Value::Null);
                 }
+                Some(menus::MenuAction::Dialog(id, initial)) => {
+                    self.marking = None;
+                    self.open_dialog(&id, &initial, None);
+                }
                 Some(menus::MenuAction::Close) if !self.marking_fresh => self.marking = None,
                 Some(menus::MenuAction::Close) => {}
                 None => {}
@@ -656,7 +660,7 @@ impl FormCraftApp {
         }
         self.marking_fresh = false;
         if let Some((mut text, at)) = self.search.take() {
-            match menus::shortcut_box(ui, t, &self.session, &mut text, at) {
+            match menus::shortcut_box(ui, t, &self.session, &mut text, at, &mut self.layout.favorites) {
                 Some(menus::BoxAction::Run(id)) => self.run(&id, Value::Null),
                 Some(menus::BoxAction::Ai(prompt)) => self.run("ai.generate", serde_json::json!({"prompt": prompt})),
                 Some(menus::BoxAction::Close) => {}

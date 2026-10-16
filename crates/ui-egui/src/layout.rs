@@ -37,6 +37,8 @@ pub struct Layout {
     pub text_commands: PanelState,
     pub assistant: PanelState,
     pub nav_bar: bool,
+    /// Favourite commands of the shortcut box (6×2 grid).
+    pub favorites: Vec<String>,
     pub view_cube: bool,
     pub grid: bool,
     pub visual_style: VisualStyle,
@@ -72,6 +74,22 @@ impl Default for Layout {
             text_commands: PanelState::docked(false, 160.0),
             assistant: PanelState::docked(false, 300.0),
             nav_bar: true,
+            favorites: [
+                "sketch.create",
+                "solid.extrude",
+                "solid.revolve",
+                "solid.hole",
+                "solid.fillet",
+                "solid.chamfer",
+                "solid.press_pull",
+                "solid.shell",
+                "solid.combine",
+                "solid.box",
+                "doc.parameters",
+                "ai.generate",
+            ]
+            .map(String::from)
+            .to_vec(),
             view_cube: true,
             grid: true,
             visual_style: VisualStyle::ShadedEdges,
