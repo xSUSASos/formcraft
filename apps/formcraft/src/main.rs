@@ -12,8 +12,38 @@ use std::process::ExitCode;
 use formcraft_ui_egui::theme::ThemeKind;
 use formcraft_ui_egui::{AppOptions, run};
 
+/// Log lines go to stderr and to `<logs>/formcraft.log` (the previous run's file is kept as
+/// `formcraft.old.log`).
+struct Tee(Option<std::fs::File>);
+
+impl std::io::Write for Tee {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let _ = std::io::stderr().write_all(buf);
+        if let Some(f) = self.0.as_mut() {
+            f.write_all(buf)?;
+        }
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.0.as_mut().map_or(Ok(()), std::io::Write::flush)
+    }
+}
+
+fn init_logging() {
+    let file = formcraft_ui_egui::settings::logs_dir().and_then(|d| {
+        std::fs::create_dir_all(&d).ok()?;
+        let path = d.join("formcraft.log");
+        let _ = std::fs::rename(&path, d.join("formcraft.old.log"));
+        std::fs::File::create(path).ok()
+    });
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,wgpu=warn,naga=warn,eframe=warn"))
+        .target(env_logger::Target::Pipe(Box::new(Tee(file))))
+        .init();
+    log::info!("FormCraft {} starting", env!("CARGO_PKG_VERSION"));
+}
+
 fn main() -> ExitCode {
-    env_logger::init();
+    init_logging();
     let mut opts = AppOptions::default();
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {

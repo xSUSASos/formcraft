@@ -37,6 +37,8 @@ pub struct Layout {
     pub text_commands: PanelState,
     pub assistant: PanelState,
     pub nav_bar: bool,
+    /// Preferences (language, scale, assistant backend…).
+    pub settings: crate::settings::Settings,
     /// Favourite commands of the shortcut box (6×2 grid).
     pub favorites: Vec<String>,
     pub view_cube: bool,
@@ -74,6 +76,7 @@ impl Default for Layout {
             text_commands: PanelState::docked(false, SIZE.text_commands_h),
             assistant: PanelState::docked(false, 300.0),
             nav_bar: true,
+            settings: crate::settings::Settings::default(),
             favorites: [
                 "sketch.create",
                 "solid.extrude",
@@ -100,8 +103,8 @@ impl Default for Layout {
 impl Layout {
     /// Defaults, keeping the user's theme.
     pub fn reset(&mut self) {
-        let theme = self.theme;
-        *self = Layout { theme, ..Layout::default() };
+        let (theme, settings) = (self.theme, self.settings.clone());
+        *self = Layout { theme, settings, ..Layout::default() };
     }
 
     /// Clamp sizes coming from a stored file (it may be edited or corrupt).
@@ -113,6 +116,7 @@ impl Layout {
         clamp(&mut self.timeline, 36.0, 120.0, SIZE.timeline_h);
         clamp(&mut self.text_commands, 80.0, 600.0, 160.0);
         clamp(&mut self.assistant, 200.0, 700.0, 300.0);
+        self.settings.sanitize();
     }
 }
 

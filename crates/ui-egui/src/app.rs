@@ -133,6 +133,11 @@ pub struct FormCraftApp {
     addins: crate::addins::AddIns,
     /// Port of the running control channel (scripts connect to it).
     control_port: Option<u16>,
+    /// Preferences window and the last assistant connection check.
+    settings_open: bool,
+    ai_check: String,
+    /// The interface scale applied to the context.
+    applied_scale: f32,
     /// Section Analysis view: plane, offset and the cut model for a revision.
     section: Option<(String, f64, Option<(u64, formcraft_engine::regen::Model)>)>,
 }
@@ -182,7 +187,7 @@ impl FormCraftApp {
     /// App without eframe storage (tests and headless use).
     pub fn with_state(layout: Layout, camera: Camera, options: AppOptions) -> Self {
         let mut session = Session::new();
-        let (generator, ai_status) = match formcraft_ai::install(&mut session, &formcraft_ai::AiConfig::from_env()) {
+        let (generator, ai_status) = match formcraft_ai::install(&mut session, &layout.settings.ai_config()) {
             Ok(g) => (Some(g), None),
             Err(e) => (None, Some(format!("Assistant unavailable: {e}"))),
         };
@@ -244,6 +249,9 @@ impl FormCraftApp {
             addins: crate::addins::AddIns::new(),
             control_port: None,
             section: None,
+            settings_open: false,
+            ai_check: String::new(),
+            applied_scale: 0.0,
         };
         if let Some(path) = app.options.script.clone() {
             app.run_script_file(&path);
@@ -389,6 +397,54 @@ impl FormCraftApp {
                     if let Some(port) = self.control_port {
                         self.addins.start_script(&path, port);
                     }
+                }
+            }
+        }
+    }
+
+    /// The preferences window and its actions.
+    fn settings_frame(&mut self, ui: &mut Ui, t: &Tokens) {
+        if !self.settings_open {
+            return;
+        }
+        let mut open = true;
+        let mut theme = self.layout.theme;
+        let mut settings = self.layout.settings.clone();
+        let action = crate::settings::window(ui, t, &mut open, &mut theme, &mut settings, &self.ai_check);
+        self.settings_open = open;
+        self.layout.theme = theme;
+        settings.sanitize();
+        self.layout.settings = settings;
+        match action {
+            crate::settings::SettingsAction::None => {}
+            crate::settings::SettingsAction::ApplyAi | crate::settings::SettingsAction::CheckAi => {
+                match self.layout.settings.ai_config().build() {
+                    Ok(backend) => {
+                        self.ai_check = match backend.status() {
+                            Ok(v) => format!(
+                                "{} · {}: {}",
+                                backend.kind(),
+                                backend.model(),
+                                if v["available"].as_bool() == Some(false) { "model not installed" } else { "ok" }
+                            ),
+                            Err(e) => format!("{}: {e}", backend.kind()),
+                        };
+                        if matches!(action, crate::settings::SettingsAction::ApplyAi) {
+                            self.assistant.generator = Some(std::sync::Arc::new(formcraft_ai::Generator::new(backend)));
+                        }
+                    }
+                    Err(e) => self.ai_check = e,
+                }
+            }
+            crate::settings::SettingsAction::ResetLayout => {
+                self.layout.reset();
+                self.status = "Layout reset".into();
+            }
+            crate::settings::SettingsAction::OpenLogs => {
+                if let Some(d) = crate::settings::logs_dir() {
+                    let _ = std::fs::create_dir_all(&d);
+                    let cmd = if cfg!(windows) { "explorer" } else { "xdg-open" };
+                    let _ = std::process::Command::new(cmd).arg(d).spawn();
                 }
             }
         }
@@ -693,7 +749,7 @@ impl FormCraftApp {
                 return;
             }
             "tools.settings" => {
-                self.status = "Preferences: theme and layout are in the View menu".into();
+                self.settings_open = !self.settings_open;
                 return;
             }
             "ai.generate" if params.is_null() => {
@@ -2228,6 +2284,13 @@ impl FormCraftApp {
     /// Paint the whole UI into `ui` (the root of the window).
     pub fn draw(&mut self, ui: &mut Ui) {
         let t = self.tokens();
+        crate::i18n::set(self.layout.settings.language);
+        let scale = self.layout.settings.ui_scale;
+        if (scale - self.applied_scale).abs() > 1e-3 {
+            ui.ctx().set_zoom_factor(scale);
+            self.applied_scale = scale;
+        }
+        ui.ctx().all_styles_mut(|s| s.animation_time = if self.layout.settings.animations { 1.0 / 12.0 } else { 0.0 });
         if !self.fonts_installed {
             crate::theme::install_fonts(ui.ctx());
             ui.ctx().all_styles_mut(Tokens::apply_text_styles);
@@ -2251,6 +2314,7 @@ impl FormCraftApp {
         if self.sketch_mode.is_some() {
             self.sketch_palette(ui, &t);
         }
+        self.settings_frame(ui, &t);
         self.assistant_panel(ui, &t);
         self.addins_frame(ui, &t);
         self.error_toast(ui, &t);
