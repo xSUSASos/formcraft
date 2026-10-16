@@ -87,6 +87,8 @@ pub fn show(ui: &mut Ui, area: Rect, cam: &Camera, t: &Tokens) -> Option<CubeAct
     };
     let back = cam.back();
     let hover = resp.hover_pos();
+    // translucent at rest, opaque under the pointer
+    let alpha = if hover.is_some() { 1.0 } else { crate::theme::SIZE.viewcube_idle_alpha };
     let mut hovered: Option<(CubeView, [Pos2; 4])> = None;
 
     // Visible faces, far to near.
@@ -98,8 +100,8 @@ pub fn show(ui: &mut Ui, area: Rect, cam: &Camera, t: &Tokens) -> Option<CubeAct
         let fill = t.cube_face.gamma_multiply(shade);
         painter.add(Shape::convex_polygon(
             quad.to_vec(),
-            Color32::from_rgb(fill.r(), fill.g(), fill.b()),
-            Stroke::new(1.0, t.cube_edge),
+            Color32::from_rgb(fill.r(), fill.g(), fill.b()).gamma_multiply(alpha),
+            Stroke::new(1.0, t.cube_edge.gamma_multiply(alpha)),
         ));
         for i in -1..=1i8 {
             for j in -1..=1i8 {
@@ -116,11 +118,17 @@ pub fn show(ui: &mut Ui, area: Rect, cam: &Camera, t: &Tokens) -> Option<CubeAct
             && n.dot(back) > 0.35
         {
             let size = 9.0 + 2.5 * n.dot(back) as f32;
-            painter.text(proj.to_screen(n), Align2::CENTER_CENTER, label, FontId::proportional(size), t.cube_text);
+            painter.text(
+                proj.to_screen(n),
+                Align2::CENTER_CENTER,
+                label,
+                FontId::proportional(size),
+                t.cube_text.gamma_multiply(alpha),
+            );
         }
     }
     if let Some((_, poly)) = &hovered {
-        painter.add(Shape::convex_polygon(poly.to_vec(), t.accent_hover.gamma_multiply(0.55), Stroke::NONE));
+        painter.add(Shape::convex_polygon(poly.to_vec(), t.accent.gamma_multiply(0.55), Stroke::NONE));
     }
     // Axis tripod at the bottom-left corner of the cube.
     let origin = proj.to_screen(DVec3::new(-1.0, -1.0, -1.0));

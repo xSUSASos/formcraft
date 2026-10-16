@@ -352,7 +352,10 @@ pub fn install_fonts(ctx: &egui::Context) {
     ctx.set_fonts(fonts);
 }
 
-/// Heading font of cards and dialogs.
-pub fn heading() -> FontId {
-    FontId::new(SIZE.font_heading, FontFamily::Name(SEMIBOLD.into()))
+/// Heading font of cards and dialogs (semibold once the fonts are installed; fonts set with
+/// `set_fonts` only apply from the next frame).
+pub fn heading(ctx: &egui::Context) -> FontId {
+    let family = FontFamily::Name(SEMIBOLD.into());
+    let ready = ctx.fonts(|f| f.families().contains(&family));
+    FontId::new(SIZE.font_heading, if ready { family } else { FontFamily::Proportional })
 }

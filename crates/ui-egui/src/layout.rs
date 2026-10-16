@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::theme::ThemeKind;
+use crate::theme::{SIZE, ThemeKind};
 
 /// Where a dockable panel lives.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -31,6 +31,8 @@ impl PanelState {
 pub struct Layout {
     pub theme: ThemeKind,
     pub browser: PanelState,
+    /// Browser card folded to its header.
+    pub browser_collapsed: bool,
     pub timeline: PanelState,
     pub text_commands: PanelState,
     pub assistant: PanelState,
@@ -62,9 +64,10 @@ impl VisualStyle {
 impl Default for Layout {
     fn default() -> Self {
         Layout {
-            theme: ThemeKind::Dark,
-            browser: PanelState::docked(true, 250.0),
-            timeline: PanelState::docked(true, 44.0),
+            theme: ThemeKind::Light,
+            browser: PanelState::docked(true, SIZE.browser_w),
+            browser_collapsed: false,
+            timeline: PanelState::docked(true, SIZE.timeline_h),
             // Text Commands starts collapsed, like Fusion's.
             text_commands: PanelState::docked(false, 160.0),
             assistant: PanelState::docked(false, 300.0),
@@ -88,8 +91,8 @@ impl Layout {
         let clamp = |p: &mut PanelState, lo: f32, hi: f32, def: f32| {
             p.size = if p.size.is_finite() { p.size.clamp(lo, hi) } else { def };
         };
-        clamp(&mut self.browser, 150.0, 700.0, 250.0);
-        clamp(&mut self.timeline, 36.0, 120.0, 44.0);
+        clamp(&mut self.browser, 150.0, 700.0, SIZE.browser_w);
+        clamp(&mut self.timeline, 36.0, 120.0, SIZE.timeline_h);
         clamp(&mut self.text_commands, 80.0, 600.0, 160.0);
         clamp(&mut self.assistant, 200.0, 700.0, 300.0);
     }

@@ -168,7 +168,8 @@ fn clicking_the_canvas_picks_faces() {
     assert!(h.state_mut().session().selection().items.is_empty());
     // Click on empty space clears.
     click(&mut h, c);
-    let empty = h.state().canvas_rect.left_top() + Vec2::new(20.0, 200.0);
+    // right edge of the canvas: outside the part, the Browser card and the ViewCube
+    let empty = h.state().canvas_rect.right_center() - Vec2::new(20.0, 0.0);
     click(&mut h, empty);
     assert!(h.state_mut().session().selection().items.is_empty());
 }

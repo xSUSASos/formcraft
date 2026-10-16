@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 
-use egui::{Align2, Color32, FontId, Id, Panel, Pos2, Rect, Sense, Stroke, Ui, Vec2, pos2};
+use egui::{Align2, Color32, CornerRadius, FontId, Id, Panel, Pos2, Rect, Sense, Stroke, Ui, Vec2, pos2};
 use formcraft_engine::doc::{BodyId, FeatureId};
 use formcraft_engine::{Pick, Session};
 use formcraft_render::camera::{Camera, Projection};
@@ -117,6 +117,8 @@ pub struct FormCraftApp {
     /// `ui.screenshot` requests waiting for the next frame's pixels.
     pending_shots: Vec<(control::Reply, Option<PathBuf>)>,
     fonts_installed: bool,
+    /// The next "close/new document" click discards unsaved changes.
+    discard_armed: bool,
 }
 
 /// Marks screenshots requested through the control channel.
@@ -216,6 +218,7 @@ impl FormCraftApp {
             control_renderer: None,
             pending_shots: Vec::new(),
             fonts_installed: false,
+            discard_armed: false,
         };
         if let Some(path) = app.options.script.clone() {
             app.run_script_file(&path);
@@ -851,54 +854,122 @@ impl FormCraftApp {
     // ------------------------------------------------------------------ application bar
 
     fn app_bar(&mut self, ui: &mut Ui, t: &Tokens) {
+        let g = SIZE.grid;
         Panel::top("app_bar")
-            .exact_size(30.0)
-            .frame(egui::Frame::new().fill(t.appbar_bg).inner_margin(egui::Margin::symmetric(8, 4)))
+            .exact_size(SIZE.appbar_h)
+            .frame(egui::Frame::new().fill(t.appbar_bg).inner_margin(egui::Margin::symmetric(g as i8 * 2, 0)))
             .show(ui, |ui| {
                 ui.visuals_mut().override_text_color = Some(t.appbar_fg);
                 ui.horizontal_centered(|ui| {
-                    ui.label(egui::RichText::new("FormCraft").strong().color(t.accent));
-                    ui.separator();
-                    ui.menu_button("File", |ui| {
-                        for (label, id) in [
-                            ("New Design", "doc.new"),
-                            ("Open…", "doc.open"),
-                            ("Save", "doc.save"),
-                            ("Export…", "doc.export"),
-                        ] {
-                            let on = self.session.registry().get(id).is_some();
-                            if ui.add_enabled(on, egui::Button::new(label)).clicked() {
-                                ui.close();
-                                self.file_action(id);
-                            }
-                        }
-                    });
+                    ui.spacing_mut().item_spacing.x = g;
+                    // App mark: an accent tile with the product initial (drawn, no asset).
+                    let (r, _) = ui.allocate_exact_size(Vec2::splat(SIZE.icon_nav), Sense::hover());
+                    ui.painter().rect_filled(r, CornerRadius::same(SIZE.radius_button), t.accent);
+                    ui.painter().text(
+                        r.center(),
+                        Align2::CENTER_CENTER,
+                        "F",
+                        crate::theme::heading(ui.ctx()),
+                        t.appbar_fg,
+                    );
+                    let menu = self.appbar_button(ui, t, "menu", "File, View, Help", true);
+                    egui::Popup::menu(&menu).show(|ui| self.main_menu(ui));
+                    if self.appbar_button(ui, t, "save", "Save (Ctrl+S)", true).clicked() {
+                        self.file_action("doc.save");
+                    }
                     let undo_on = self.session.can_undo();
-                    if icons::button(ui, t, "undo", "Undo (Ctrl+Z)", 20.0, undo_on, false).clicked() {
+                    if self.appbar_button(ui, t, "undo", "Undo (Ctrl+Z)", undo_on).clicked() {
                         self.run("doc.undo", Value::Null);
                     }
                     let redo_on = self.session.can_redo();
-                    if icons::button(ui, t, "redo", "Redo (Ctrl+Y)", 20.0, redo_on, false).clicked() {
+                    if self.appbar_button(ui, t, "redo", "Redo (Ctrl+Y)", redo_on).clicked() {
                         self.run("doc.redo", Value::Null);
                     }
-                    ui.menu_button("View", |ui| self.view_menu(ui));
-                    ui.menu_button("Help", |ui| {
-                        if ui.button("About FormCraft").clicked() {
+                    ui.add_space(g * 4.0);
+                    self.doc_tab(ui, t);
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.spacing_mut().item_spacing.x = g;
+                        if self.appbar_button(ui, t, "help", "Help", true).clicked() {
                             self.run("app.about", Value::Null);
-                            ui.close();
+                        }
+                        if self.appbar_button(ui, t, "settings", "Preferences", true).clicked() {
+                            self.run("tools.settings", Value::Null);
+                        }
+                        if self.appbar_button(ui, t, "ai", "Assistant (describe a part to build)", true).clicked() {
+                            self.layout.assistant.open = !self.layout.assistant.open;
+                            if self.search.is_none() {
+                                self.search =
+                                    Some((String::new(), self.canvas_rect.center_top() + Vec2::new(0.0, 40.0)));
+                            }
+                        }
+                        if self.appbar_button(ui, t, "search", "Search commands (S)", true).clicked() {
+                            self.search = Some((String::new(), self.canvas_rect.center_top() + Vec2::new(0.0, 40.0)));
                         }
                     });
-                    // Document name in the middle.
-                    let rect = ui.max_rect();
-                    ui.painter().text(
-                        rect.center(),
-                        Align2::CENTER_CENTER,
-                        &self.doc_name,
-                        FontId::proportional(SIZE.font_panel),
-                        t.appbar_fg,
-                    );
                 });
             });
+    }
+
+    /// An icon button on the dark application bar.
+    fn appbar_button(&self, ui: &mut Ui, t: &Tokens, icon: &str, tip: &str, on: bool) -> egui::Response {
+        let side = SIZE.appbar_h - SIZE.grid * 2.0;
+        let (rect, resp) = ui.allocate_exact_size(Vec2::splat(side), if on { Sense::click() } else { Sense::hover() });
+        if on && resp.hovered() {
+            ui.painter().rect_filled(rect, CornerRadius::same(SIZE.radius_button), t.doc_tab_active);
+        }
+        let color = if on { t.appbar_fg } else { t.appbar_fg.gamma_multiply(0.35) };
+        let icon_rect = Rect::from_center_size(rect.center(), Vec2::splat(SIZE.icon_nav));
+        icons::paint(ui.painter(), icon_rect, icon, color, t);
+        resp.on_hover_text(tip)
+    }
+
+    /// The document tab: name, unsaved dot, close; "+" starts a new design.
+    fn doc_tab(&mut self, ui: &mut Ui, t: &Tokens) {
+        let g = SIZE.grid;
+        let font = FontId::proportional(SIZE.font_panel);
+        let name = self.doc_name.clone();
+        let galley = ui.painter().layout_no_wrap(name, font, t.appbar_fg);
+        let w = galley.size().x + g * 10.0;
+        let (rect, _) = ui.allocate_exact_size(Vec2::new(w, SIZE.appbar_h - g * 2.0), Sense::hover());
+        ui.painter().rect_filled(rect, CornerRadius::same(SIZE.radius_button), t.doc_tab_active);
+        let text_pos = rect.left_center() + Vec2::new(g * 3.0, -galley.size().y / 2.0);
+        ui.painter().galley(text_pos, galley, t.appbar_fg);
+        if self.session.is_dirty() {
+            ui.painter().circle_filled(rect.left_center() + Vec2::new(g * 1.5, 0.0), g * 0.75, t.appbar_fg);
+        }
+        let close = Rect::from_center_size(rect.right_center() - Vec2::new(g * 3.0, 0.0), Vec2::splat(SIZE.icon_menu));
+        let cr = ui.interact(close, Id::new("doc_tab_close"), Sense::click()).on_hover_text("Close (new design)");
+        icons::paint(ui.painter(), close.shrink(g), "close", t.appbar_fg.gamma_multiply(0.8), t);
+        let new = self.appbar_button(ui, t, "plus", "New Design", true).clicked();
+        if cr.clicked() || new {
+            // Unsaved work is never dropped by one click: the first click warns.
+            if self.session.is_dirty() && !self.discard_armed {
+                self.discard_armed = true;
+                self.status = "Unsaved changes: save (Ctrl+S) or click again to discard them".into();
+            } else {
+                self.discard_armed = false;
+                self.file_action("doc.new");
+            }
+        }
+    }
+
+    /// The hamburger menu: file actions, view options, help.
+    fn main_menu(&mut self, ui: &mut Ui) {
+        for (label, id) in
+            [("New Design", "doc.new"), ("Open…", "doc.open"), ("Save", "doc.save"), ("Export…", "doc.export")]
+        {
+            let on = self.session.registry().get(id).is_some();
+            if ui.add_enabled(on, egui::Button::new(label)).clicked() {
+                ui.close();
+                self.file_action(id);
+            }
+        }
+        ui.separator();
+        ui.menu_button("View", |ui| self.view_menu(ui));
+        if ui.button("About FormCraft").clicked() {
+            self.run("app.about", Value::Null);
+            ui.close();
+        }
     }
 
     /// File menu actions that need a file dialog first (programmatic calls never open one).
@@ -973,21 +1044,51 @@ impl FormCraftApp {
 
     fn toolbar(&mut self, ui: &mut Ui, t: &Tokens) {
         let mut action = None;
-        Panel::top("toolbar")
-            .frame(egui::Frame::new().fill(t.toolbar_bg).inner_margin(egui::Margin::symmetric(8, 4)))
+        let sketching = self.sketch_mode.is_some();
+        Panel::top("toolbar_tabs")
+            .exact_size(SIZE.tabs_h)
+            .frame(egui::Frame::new().fill(t.toolbar_bg).inner_margin(egui::Margin::symmetric(SIZE.grid as i8 * 2, 0)))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_centered(|ui| {
                     egui::ComboBox::from_id_salt("workspace")
-                        .selected_text(egui::RichText::new("DESIGN").strong())
-                        .width(90.0)
+                        .selected_text(egui::RichText::new("DESIGN").size(SIZE.font_toolbar).strong())
+                        .width(SIZE.grid * 22.0)
                         .show_ui(ui, |ui| {
                             let _ = ui.selectable_label(true, "Design");
                         });
-                    ui.add_space(8.0);
-                    toolbar::tabs(ui, t, &mut self.tab);
+                    ui.add_space(SIZE.grid * 2.0);
+                    toolbar::tabs(ui, t, &mut self.tab, sketching);
                 });
-                ui.add_space(2.0);
-                action = toolbar::groups_ui(ui, t, self.session.registry(), &self.tab);
+            });
+        Panel::top("toolbar")
+            .exact_size(SIZE.toolbar_h)
+            .frame(egui::Frame::new().fill(t.toolbar_bg).inner_margin(egui::Margin {
+                left: SIZE.grid as i8 * 2,
+                right: SIZE.grid as i8 * 2,
+                top: 2,
+                bottom: 0,
+            }))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    action = toolbar::groups_ui(ui, t, self.session.registry(), &self.tab);
+                    if sketching {
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            let text = egui::RichText::new("FINISH SKETCH")
+                                .size(SIZE.font_toolbar)
+                                .strong()
+                                .color(Color32::WHITE);
+                            let b = egui::Button::new(text)
+                                .fill(t.ok)
+                                .corner_radius(CornerRadius::same(SIZE.radius_button))
+                                .min_size(Vec2::new(SIZE.grid * 28.0, SIZE.icon_toolbar));
+                            if ui.add(b).on_hover_text("Finish Sketch").clicked() {
+                                action = Some(Action::Run("sketch.finish".into()));
+                            }
+                        });
+                    }
+                });
+                let r = ui.max_rect();
+                ui.painter().hline(r.x_range(), r.bottom(), Stroke::new(1.0, t.divider));
             });
         if let Some(Action::Run(id)) = action {
             self.run(&id, Value::Null);
@@ -998,18 +1099,33 @@ impl FormCraftApp {
 
     fn browser_contents(&mut self, ui: &mut Ui, t: &Tokens) {
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new("BROWSER").size(11.0).strong().color(t.text_secondary));
+            let collapsed = self.layout.browser_collapsed;
+            let arrow = if collapsed { "expand" } else { "dropdown" };
+            let title = egui::RichText::new("BROWSER")
+                .size(SIZE.font_group)
+                .extra_letter_spacing(SIZE.group_letter_spacing)
+                .strong()
+                .color(t.text_secondary);
+            let (r, resp) = ui.allocate_exact_size(Vec2::splat(SIZE.icon_menu), Sense::click());
+            icons::paint(ui.painter(), r.shrink(SIZE.grid), arrow, t.text_secondary, t);
+            let label = ui.add(egui::Label::new(title).sense(Sense::click()));
+            if resp.clicked() || label.clicked() {
+                self.layout.browser_collapsed = !collapsed;
+            }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if icons::button(ui, t, "close", "Close", 16.0, true, false).clicked() {
+                if icons::button(ui, t, "close", "Close", SIZE.icon_menu, true, false).clicked() {
                     self.layout.browser.open = false;
                 }
                 let dock = self.layout.browser.dock;
-                let (icon, tip) = if dock == Dock::Docked { ("float", "Float") } else { ("dock", "Dock") };
-                if icons::button(ui, t, icon, tip, 16.0, true, false).clicked() {
+                let (icon, tip) = if dock == Dock::Docked { ("float", "Float") } else { ("dock", "Pin to the canvas") };
+                if icons::button(ui, t, icon, tip, SIZE.icon_menu, true, false).clicked() {
                     self.layout.browser.dock = if dock == Dock::Docked { Dock::Floating } else { Dock::Docked };
                 }
             });
         });
+        if self.layout.browser_collapsed {
+            return;
+        }
         ui.separator();
         egui::ScrollArea::vertical().show(ui, |ui| {
             egui::CollapsingHeader::new(self.doc_name.clone()).default_open(true).show(ui, |ui| {
@@ -1105,26 +1221,41 @@ impl FormCraftApp {
         }
     }
 
+    /// The Browser: a card floating over the canvas (§5.3). "Docked" pins it 8px from the
+    /// canvas corner; "floating" lets it be dragged anywhere.
     fn browser(&mut self, ui: &mut Ui, t: &Tokens) {
         if !self.layout.browser.open {
             return;
         }
+        let card = egui::Frame::new()
+            .fill(t.panel_bg)
+            .stroke(Stroke::new(1.0, t.divider))
+            .corner_radius(CornerRadius::same(SIZE.radius_card))
+            .shadow(egui::Shadow { offset: [0, 2], blur: 12, spread: 0, color: t.panel_shadow })
+            .inner_margin(egui::Margin::same(SIZE.grid as i8 * 2));
+        let canvas = self.canvas_rect;
+        let max_h =
+            (canvas.height() - SIZE.card_margin * 2.0 - SIZE.nav_h - SIZE.nav_bottom).max(SIZE.tree_row_h * 2.0);
         match self.layout.browser.dock {
             Dock::Docked => {
-                let r = Panel::left("browser")
-                    .resizable(true)
-                    .default_size(self.layout.browser.size)
-                    .size_range(150.0..=700.0)
-                    .frame(egui::Frame::new().fill(t.panel_bg).inner_margin(6))
-                    .show(ui, |ui| self.browser_contents(ui, t));
-                self.layout.browser.size = r.response.rect.width();
+                egui::Area::new(Id::new("browser_card"))
+                    .order(egui::Order::Middle)
+                    .fixed_pos(canvas.min + Vec2::splat(SIZE.card_margin))
+                    .show(ui.ctx(), |ui| {
+                        card.show(ui, |ui| {
+                            ui.set_width(self.layout.browser.size - SIZE.grid * 4.0);
+                            ui.set_max_height(max_h);
+                            self.browser_contents(ui, t);
+                        });
+                    });
             }
             Dock::Floating => {
                 let mut open = true;
                 egui::Window::new("Browser")
                     .id(Id::new("browser_window"))
                     .title_bar(false)
-                    .default_pos(pos2(20.0, 120.0))
+                    .frame(card)
+                    .default_pos(canvas.min + Vec2::new(SIZE.card_margin * 4.0, SIZE.card_margin * 4.0))
                     .default_width(self.layout.browser.size)
                     .resizable(true)
                     .open(&mut open)
@@ -1145,12 +1276,16 @@ impl FormCraftApp {
         let mut action = None;
         Panel::bottom("timeline")
             .exact_size(self.layout.timeline.size)
-            .frame(egui::Frame::new().fill(t.panel_bg).inner_margin(egui::Margin::symmetric(8, 6)))
+            .frame(egui::Frame::new().fill(t.timeline_bg).inner_margin(egui::Margin::symmetric(SIZE.grid as i8 * 2, 0)))
             .show(ui, |ui| action = timeline::ui(ui, t, &self.session));
         let Some(a) = action else { return };
         use serde_json::json;
         match a {
             timeline::Action::Edit(id) => self.edit_feature(id),
+            timeline::Action::Settings => {
+                self.status =
+                    "Timeline: drag icons to reorder, drag the marker to roll back, right-click for more".into();
+            }
             timeline::Action::Rename(id) => {
                 let name = self.session.document().feature(id).map(|f| f.name.clone()).unwrap_or_default();
                 self.rename = Some((id, name));
@@ -1355,7 +1490,11 @@ impl FormCraftApp {
         }
 
         if self.layout.view_cube {
-            let area = Rect::from_min_size(pos2(rect.right() - 150.0, rect.top() + 8.0), Vec2::splat(140.0));
+            let side = SIZE.viewcube + SIZE.grid * 6.0;
+            let area = Rect::from_min_size(
+                pos2(rect.right() - side - SIZE.card_margin, rect.top() + SIZE.card_margin),
+                Vec2::splat(side),
+            );
             self.cube_area = area;
             match viewcube::show(ui, area, &self.camera, t) {
                 Some(CubeAction::View(v)) => {
@@ -1597,42 +1736,46 @@ impl FormCraftApp {
     }
 
     fn nav_bar(&mut self, ui: &mut Ui, t: &Tokens, canvas: Rect) {
-        let pos = pos2(canvas.center().x, canvas.bottom() - 12.0);
+        let pos = pos2(canvas.center().x, canvas.bottom() - SIZE.nav_bottom);
         egui::Area::new(Id::new("nav_bar")).fixed_pos(pos).pivot(Align2::CENTER_BOTTOM).show(ui.ctx(), |ui| {
+            let button = SIZE.nav_h - SIZE.grid * 2.0;
             egui::Frame::new()
-                .fill(t.panel_bg.gamma_multiply(0.95))
-                .corner_radius(6)
+                .fill(t.panel_bg)
+                .corner_radius(CornerRadius::same(SIZE.radius_card))
                 .stroke(Stroke::new(1.0, t.divider))
-                .inner_margin(egui::Margin::symmetric(8, 3))
+                .shadow(egui::Shadow { offset: [0, 2], blur: 12, spread: 0, color: t.panel_shadow })
+                .inner_margin(egui::Margin::symmetric(SIZE.grid as i8 * 2, SIZE.grid as i8))
                 .show(ui, |ui| {
-                    ui.horizontal(|ui| {
+                    ui.set_height(button);
+                    ui.horizontal_centered(|ui| {
+                        ui.spacing_mut().item_spacing.x = SIZE.grid;
                         for (mode, icon, tip) in [
                             (NavMode::Orbit, "orbit", "Orbit (Shift + middle drag)"),
                             (NavMode::Pan, "pan", "Pan (middle drag)"),
                             (NavMode::Zoom, "zoom", "Zoom (wheel)"),
                         ] {
                             let on = self.nav == mode;
-                            if icons::button(ui, t, icon, tip, 22.0, true, on).clicked() {
+                            if icons::button(ui, t, icon, tip, button, true, on).clicked() {
                                 self.nav = if on { NavMode::Select } else { mode };
                             }
                         }
-                        if icons::button(ui, t, "fit", "Fit (F6, double-click middle button)", 22.0, true, false)
+                        if icons::button(ui, t, "fit", "Fit (F6, double-click middle button)", button, true, false)
                             .clicked()
                         {
                             self.fit();
                         }
                         ui.separator();
-                        let style = icons::button(ui, t, "style", "Visual Style", 22.0, true, false);
+                        let style = icons::button(ui, t, "style", "Visual Style", button, true, false);
                         egui::Popup::menu(&style).show(|ui| {
                             for s in VisualStyle::ALL {
                                 ui.selectable_value(&mut self.layout.visual_style, s, s.label());
                             }
                         });
-                        if icons::button(ui, t, "grid", "Grid", 22.0, true, self.layout.grid).clicked() {
+                        if icons::button(ui, t, "grid", "Grid", button, true, self.layout.grid).clicked() {
                             self.layout.grid = !self.layout.grid;
                         }
                         let persp = self.camera.projection == Projection::Perspective;
-                        if icons::button(ui, t, "ortho", "Orthographic / Perspective", 22.0, true, !persp).clicked() {
+                        if icons::button(ui, t, "ortho", "Orthographic / Perspective", button, true, !persp).clicked() {
                             self.camera.projection =
                                 if persp { Projection::Orthographic } else { Projection::Perspective };
                         }
@@ -1725,10 +1868,10 @@ impl FormCraftApp {
         self.toolbar(ui, &t);
         self.timeline(ui, &t);
         self.text_commands(ui, &t);
-        self.browser(ui, &t);
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(Color32::TRANSPARENT))
             .show(ui, |ui| self.canvas(ui, &t));
+        self.browser(ui, &t);
         self.feature_dialog(ui, &t);
         self.rename_dialog(ui);
         self.plane_picker_ui(ui);
