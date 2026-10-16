@@ -125,7 +125,7 @@ pub enum Action {
 
 /// UI-level commands handled by the shell itself (not engine commands).
 pub fn is_ui_command(id: &str) -> bool {
-    matches!(id, "tools.text_commands" | "tools.settings")
+    matches!(id, "tools.text_commands" | "tools.settings" | "tools.scripts")
         || (id.starts_with("sketch.") && id != "sketch.edit" && id != "sketch.get")
 }
 
@@ -254,6 +254,8 @@ fn icon_button(
     let w = (caption.size().x + g * 2.0).max(SIZE.icon_toolbar + g * 2.0);
     let h = SIZE.icon_toolbar + caption.size().y + g * 0.75;
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, h), if on { Sense::click() } else { Sense::hover() });
+    // screen readers and UI tests see the command name (UI_SPEC §7)
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, on, label));
     let radius = egui::CornerRadius::same(SIZE.radius_button);
     if on && resp.is_pointer_button_down_on() {
         ui.painter().rect_filled(rect, radius, t.toolbar_pressed);

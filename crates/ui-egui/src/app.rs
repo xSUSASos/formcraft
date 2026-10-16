@@ -54,6 +54,10 @@ pub struct AppOptions {
     pub overlay: Option<String>,
     /// Serve the loopback control channel on this port (`formcraft-cli mcp --port`).
     pub control: Option<u16>,
+    /// Extra add-in folders to load at startup (development: `--plugin DIR`).
+    pub plugin_dirs: Vec<PathBuf>,
+    /// Extra folders listed in Scripts and Add-Ins.
+    pub script_dirs: Vec<PathBuf>,
 }
 
 /// Browser tree visibility toggles (Origin and bodies get real items in Phase 2).
@@ -125,6 +129,10 @@ pub struct FormCraftApp {
     assistant: crate::assistant::Assistant,
     /// Body tint of the assistant's preview: (entry, body → colour).
     ai_tint: Option<(usize, std::collections::HashMap<u64, Color32>)>,
+    /// Scripts and Add-Ins dialog and the plugin host.
+    addins: crate::addins::AddIns,
+    /// Port of the running control channel (scripts connect to it).
+    control_port: Option<u16>,
 }
 
 /// Marks screenshots requested through the control channel.
@@ -154,11 +162,13 @@ impl FormCraftApp {
         }
         let mut app = Self::with_state(layout, camera, options);
         app.viewport = Viewport::new(cc.wgpu_render_state.clone());
+        app.start_plugins(true);
         if let Some(port) = app.options.control {
             let ctx = cc.egui_ctx.clone();
             match control::listen(port, move || ctx.request_repaint()) {
                 Ok((rx, bound)) => {
                     app.control = Some(rx);
+                    app.control_port = Some(bound);
                     app.status = format!("Control channel on 127.0.0.1:{bound}");
                 }
                 Err(e) => app.status = e,
@@ -229,6 +239,8 @@ impl FormCraftApp {
             toast: None,
             assistant: crate::assistant::Assistant::new(None),
             ai_tint: None,
+            addins: crate::addins::AddIns::new(),
+            control_port: None,
         };
         if let Some(path) = app.options.script.clone() {
             app.run_script_file(&path);
@@ -282,6 +294,100 @@ impl FormCraftApp {
     fn fit_keep_direction(&mut self) {
         if !self.session.model().bodies.is_empty() {
             self.fit();
+        }
+    }
+
+    /// Create the plugin host and load add-ins: the installed ones (`installed`) and
+    /// `--plugin` folders.
+    pub fn start_plugins(&mut self, installed: bool) {
+        let plugins = match formcraft_plugin::Plugins::new(self.session.kernel().clone()) {
+            Ok(p) => p,
+            Err(e) => {
+                self.status = format!("Add-ins unavailable: {e}");
+                return;
+            }
+        };
+        let mut failed = Vec::new();
+        if installed && let Some(dir) = self.addins.plugins_dir.clone() {
+            for (d, r) in plugins.load_all(&dir, &mut self.session) {
+                if let Err(e) = r {
+                    failed.push(format!("{}: {e}", d.display()));
+                }
+            }
+        }
+        for d in self.options.plugin_dirs.clone() {
+            if let Err(e) = plugins.load(&d, &mut self.session) {
+                failed.push(e.to_string());
+            }
+        }
+        self.addins.script_dirs = self.options.script_dirs.clone();
+        self.addins.plugins = Some(plugins);
+        if let Some(f) = failed.first() {
+            self.status = format!("Add-in failed to load: {f}");
+        }
+    }
+
+    /// Scripts and Add-Ins: actions and plugins that died since the last frame.
+    fn addins_frame(&mut self, ui: &mut Ui, t: &Tokens) {
+        let action = self.addins.ui(ui, t, &self.session);
+        if let Some(p) = self.addins.plugins.clone() {
+            for (id, why) in p.reap(&mut self.session) {
+                self.status = format!("Add-in `{id}` was unloaded: {why}");
+            }
+            match action {
+                crate::addins::AddInAction::None => {}
+                crate::addins::AddInAction::Install(zip) => {
+                    let r = self
+                        .addins
+                        .plugins_dir
+                        .clone()
+                        .ok_or_else(|| "no add-in folder".to_string())
+                        .and_then(|dir| {
+                            std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+                            formcraft_plugin::install::from_zip(&zip, &dir)
+                        })
+                        .and_then(|(m, dir)| {
+                            p.unload(&m.id, &mut self.session);
+                            p.load(&dir, &mut self.session).map_err(|e| e.to_string())
+                        });
+                    self.addins.message = Some(match r {
+                        Ok(l) => format!("Installed {} {}", l.manifest.name, l.manifest.version),
+                        Err(e) => format!("Install failed: {e}"),
+                    });
+                }
+                crate::addins::AddInAction::Unload(id) => {
+                    p.unload(&id, &mut self.session);
+                    self.addins.message = Some(format!("Unloaded `{id}`"));
+                }
+                crate::addins::AddInAction::Reload(dir) => {
+                    if let Ok(m) = std::fs::read_to_string(dir.join("plugin.toml"))
+                        .map_err(|e| e.to_string())
+                        .and_then(|t| formcraft_plugin::Manifest::parse(&t).map_err(|e| e.to_string()))
+                    {
+                        p.unload(&m.id, &mut self.session);
+                    }
+                    self.addins.message = Some(match p.load(&dir, &mut self.session) {
+                        Ok(l) => format!("Reloaded {}", l.manifest.name),
+                        Err(e) => format!("Reload failed: {e}"),
+                    });
+                }
+                crate::addins::AddInAction::RunScript(path) => {
+                    // scripts talk to this app over the control channel: start it on demand
+                    if self.control_port.is_none() {
+                        let ctx = ui.ctx().clone();
+                        match control::listen(0, move || ctx.request_repaint()) {
+                            Ok((rx, port)) => {
+                                self.control = Some(rx);
+                                self.control_port = Some(port);
+                            }
+                            Err(e) => self.addins.message = Some(e),
+                        }
+                    }
+                    if let Some(port) = self.control_port {
+                        self.addins.start_script(&path, port);
+                    }
+                }
+            }
         }
     }
 
@@ -563,6 +669,10 @@ impl FormCraftApp {
         match id {
             "tools.text_commands" => {
                 self.layout.text_commands.open = !self.layout.text_commands.open;
+                return;
+            }
+            "tools.scripts" => {
+                self.addins.open = !self.addins.open;
                 return;
             }
             "doc.parameters" if params.is_null() => {
@@ -2033,6 +2143,9 @@ impl FormCraftApp {
                 m.set_tool(tool);
             }
         }
+        if ui.input_mut(|i| i.consume_key(egui::Modifiers::SHIFT, egui::Key::S)) {
+            self.addins.open = !self.addins.open;
+        }
         let (home, f6) = ui.input(|i| (i.key_pressed(egui::Key::Home), i.key_pressed(egui::Key::F6)));
         if home {
             self.apply_named_view("HOME");
@@ -2093,6 +2206,7 @@ impl FormCraftApp {
             self.sketch_palette(ui, &t);
         }
         self.assistant_panel(ui, &t);
+        self.addins_frame(ui, &t);
         self.error_toast(ui, &t);
         self.handle_screenshot(ui);
     }

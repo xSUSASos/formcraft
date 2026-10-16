@@ -698,6 +698,7 @@ pub fn button(
 ) -> egui::Response {
     let sense = if enabled { egui::Sense::click() } else { egui::Sense::hover() };
     let (rect, resp) = ui.allocate_exact_size(Vec2::splat(size), sense);
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, tip));
     let radius = crate::theme::SIZE.radius_button;
     let state = if !enabled {
         IconState::Disabled

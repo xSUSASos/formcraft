@@ -19,6 +19,8 @@ use std::process::ExitCode;
 use formcraft_engine::Session;
 use serde_json::{Value, json};
 
+mod templates;
+
 const USAGE: &str = "\
 usage:
   formcraft-cli run <script|-> [--save <out.step|out.stl>] [--quiet]
@@ -29,6 +31,9 @@ usage:
   formcraft-cli mcp [--port N]     MCP server on stdio (headless, or attached to `formcraft --control N`)
   formcraft-cli screenshot <scene|all> <out.png|dir> [--theme light|dark|both] [--size WxH]
                                    offscreen UI screenshots (UI_SPEC.md §8 scenes; default 1920x1080, both themes)
+  formcraft-cli plugin install <addin.zip> | list | new <name> [--lang rust|python-script]
+                                   manage add-ins (installed into %APPDATA%/FormCraft/plugins)
+  global: --plugin <dir> (load an add-in folder, repeatable), --no-plugins (skip installed ones)
   formcraft-cli ai-bench [--limit N] [--level simple|medium] [--out report.json]
                                    score the configured LLM on crates/ai/bench/cases.json
   formcraft-cli ai \"<request>\" [--save <out.step|out.stl|out.fcraft>] [--plan-only]
@@ -41,8 +46,60 @@ A script is a JSON array of {\"command\": id, \"params\": {...}} or one command 
 /// Upper bound for scripts read from files/stdin (hostile input).
 const MAX_SCRIPT: u64 = 16 * 1024 * 1024;
 
+/// Add-in folders from `--plugin DIR` (any position); installed add-ins load too unless
+/// `--no-plugins` is given.
+static PLUGIN_DIRS: std::sync::OnceLock<(Vec<PathBuf>, bool)> = std::sync::OnceLock::new();
+
+/// A session with the assistant and the add-ins (installed + `--plugin`).
+fn new_session() -> Session {
+    let mut s = Session::new_bare();
+    if let Err(e) = formcraft_ai::install(&mut s, &formcraft_ai::AiConfig::from_env()) {
+        eprintln!("assistant unavailable: {e}");
+    }
+    let (dirs, installed) = PLUGIN_DIRS.get().cloned().unwrap_or_default();
+    if dirs.is_empty() && !installed {
+        return s;
+    }
+    match formcraft_plugin::Plugins::new(s.kernel().clone()) {
+        Err(e) => eprintln!("add-ins unavailable: {e}"),
+        Ok(p) => {
+            if installed && let Some(root) = formcraft_plugin::install::default_dir() {
+                for (d, r) in p.load_all(&root, &mut s) {
+                    if let Err(e) = r {
+                        eprintln!("add-in {}: {e}", d.display());
+                    }
+                }
+            }
+            for d in dirs {
+                if let Err(e) = p.load(&d, &mut s) {
+                    eprintln!("add-in {}: {e}", d.display());
+                }
+            }
+        }
+    }
+    s
+}
+
 fn main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let mut raw: Vec<String> = std::env::args().skip(1).collect();
+    let mut dirs = Vec::new();
+    let mut installed = true;
+    let mut i = 0;
+    while i < raw.len() {
+        match raw[i].as_str() {
+            "--plugin" if i + 1 < raw.len() => {
+                dirs.push(PathBuf::from(raw.remove(i + 1)));
+                raw.remove(i);
+            }
+            "--no-plugins" => {
+                installed = false;
+                raw.remove(i);
+            }
+            _ => i += 1,
+        }
+    }
+    let _ = PLUGIN_DIRS.set((dirs, installed));
+    let args = raw;
     let r = match args.first().map(String::as_str) {
         Some("run") => run(&args[1..]),
         Some("commands") => commands(args.get(1).map(String::as_str)),
@@ -58,6 +115,7 @@ fn main() -> ExitCode {
         Some("mcp") => mcp(&args[1..]),
         Some("ai") => ai(&args[1..]),
         Some("ai-bench") => ai_bench(&args[1..]),
+        Some("plugin") => plugin_cmd(&args[1..]),
         Some("screenshot") => screenshot(&args[1..]),
         Some("-h" | "--help" | "help") | None => {
             print!("{USAGE}");
@@ -101,10 +159,7 @@ fn run(args: &[String]) -> Result<(), String> {
         }
     }
     let steps = parse_script(&read_script(&script.ok_or("run needs a script (or - for stdin)")?)?)?;
-    let mut session = Session::new();
-    if let Err(e) = formcraft_ai::install(&mut session, &formcraft_ai::AiConfig::from_env()) {
-        eprintln!("assistant unavailable: {e}");
-    }
+    let mut session = new_session();
     for (i, (cmd, params)) in steps.iter().enumerate() {
         match session.execute(cmd, params) {
             Ok(v) => {
@@ -172,6 +227,56 @@ fn screenshot(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+fn plugin_cmd(args: &[String]) -> Result<(), String> {
+    let root = formcraft_plugin::install::default_dir().ok_or("no add-in folder (set FORMCRAFT_PLUGINS)")?;
+    match args.first().map(String::as_str) {
+        Some("install") => {
+            let zip = args.get(1).ok_or("plugin install <addin.zip>")?;
+            std::fs::create_dir_all(&root).map_err(|e| e.to_string())?;
+            let (m, dir) = formcraft_plugin::install::from_zip(Path::new(zip), &root)?;
+            // check it really loads
+            let mut s = Session::new_bare();
+            let p = formcraft_plugin::Plugins::new(s.kernel().clone()).map_err(|e| e.to_string())?;
+            let l = p.load(&dir, &mut s).map_err(|e| e.to_string())?;
+            let r = l.registered();
+            eprintln!("installed {} {} → {}", m.name, m.version, dir.display());
+            eprintln!(
+                "commands: {}",
+                r.commands
+                    .iter()
+                    .cloned()
+                    .chain(r.features.iter().map(|k| format!("{}.{k}", m.id)))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+            Ok(())
+        }
+        Some("list") => {
+            let mut s = Session::new_bare();
+            let p = formcraft_plugin::Plugins::new(s.kernel().clone()).map_err(|e| e.to_string())?;
+            for (d, r) in p.load_all(&root, &mut s) {
+                match r {
+                    Ok(id) => println!("{id}\t{}", d.display()),
+                    Err(e) => println!("(failed)\t{}\t{e}", d.display()),
+                }
+            }
+            println!("{}", serde_json::to_string_pretty(&p.describe()).unwrap_or_default());
+            Ok(())
+        }
+        Some("new") => {
+            let name = args.get(1).ok_or("plugin new <name> [--lang rust|python-script]")?;
+            let lang = args
+                .iter()
+                .position(|a| a == "--lang")
+                .and_then(|i| args.get(i + 1))
+                .map(String::as_str)
+                .unwrap_or("rust");
+            templates::create(Path::new(name), lang)
+        }
+        _ => Err("plugin install <zip> | list | new <name>".into()),
+    }
+}
+
 fn ai_bench(args: &[String]) -> Result<(), String> {
     use formcraft_ai::bench;
     let (mut limit, mut level, mut out) = (usize::MAX, None::<String>, None::<String>);
@@ -186,9 +291,8 @@ fn ai_bench(args: &[String]) -> Result<(), String> {
     }
     let cases: Vec<bench::Case> =
         bench::cases()?.into_iter().filter(|c| level.as_deref().is_none_or(|l| c.level == l)).take(limit).collect();
-    let mut s = Session::new();
     let config = formcraft_ai::AiConfig::from_env();
-    let g = formcraft_ai::install(&mut s, &config)?;
+    let g = std::sync::Arc::new(formcraft_ai::Generator::new(config.build()?));
     eprintln!("ai-bench: {} cases, {} · {}", cases.len(), config.backend, config.model);
     let n = cases.len();
     let report = bench::run(&g, &cases, &mut |i, r| {
@@ -229,9 +333,9 @@ fn ai(args: &[String]) -> Result<(), String> {
         }
     }
     let prompt = prompt.ok_or("ai needs a request in quotes")?;
-    let mut s = Session::new();
+    let s = new_session();
     let config = formcraft_ai::AiConfig::from_env();
-    let generator = formcraft_ai::install(&mut s, &config)?;
+    let generator = std::sync::Arc::new(formcraft_ai::Generator::new(config.build()?));
     eprintln!("{} · {} …", config.backend, config.model);
     let req = formcraft_ai::AiRequest { prompt, use_selection: false };
     let cancel = std::sync::atomic::AtomicBool::new(false);
@@ -261,7 +365,7 @@ fn ai(args: &[String]) -> Result<(), String> {
 }
 
 fn commands(filter: Option<&str>) -> Result<(), String> {
-    let mut s = Session::new();
+    let mut s = new_session();
     let v = s.execute("app.commands", &json!({"filter": filter.unwrap_or("")})).map_err(|e| e.to_string())?;
     println!("{}", serde_json::to_string_pretty(&v).unwrap_or_default());
     Ok(())
@@ -270,7 +374,7 @@ fn commands(filter: Option<&str>) -> Result<(), String> {
 /// A session loaded from a .fcraft design, a command script or a STEP file (bodies as
 /// imported features would need Phase 7; STEP is handled by the callers directly).
 fn load(path: &Path) -> Result<Session, String> {
-    let mut s = Session::new();
+    let mut s = new_session();
     match path.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref() {
         Some("fcraft") => {
             s.execute("doc.open", &json!({"path": path.to_string_lossy()})).map_err(|e| e.to_string())?;
@@ -290,7 +394,7 @@ fn is_step(p: &Path) -> bool {
 
 fn shapes_of(path: &Path) -> Result<(Session, Vec<formcraft_kernel::Shape>), String> {
     if is_step(path) {
-        let s = Session::new();
+        let s = new_session();
         let solids = formcraft_io::import_step(s.kernel().as_ref(), path).map_err(|e| e.to_string())?;
         Ok((s, solids))
     } else {
@@ -345,7 +449,7 @@ fn mcp(args: &[String]) -> Result<(), String> {
                 args.get(i + 1).ok_or("--port needs a number")?.parse().map_err(|e| format!("--port: {e}"))?;
             Box::new(formcraft_mcp::Remote::connect(port)?)
         }
-        None => Box::new(formcraft_mcp::Headless::new()),
+        None => Box::new(formcraft_mcp::Headless::with_session(new_session())),
     };
     let mut server = formcraft_mcp::Server::new(backend);
     let stdin = std::io::stdin();
@@ -359,7 +463,7 @@ fn info(path: &Path) -> Result<(), String> {
         println!("{}", serde_json::to_string_pretty(&v).unwrap_or_default());
         return Ok(());
     }
-    let s = Session::new();
+    let s = new_session();
     let k = s.kernel();
     let solids = formcraft_io::import_step(k.as_ref(), path).map_err(|e| e.to_string())?;
     let mut bodies = Vec::new();

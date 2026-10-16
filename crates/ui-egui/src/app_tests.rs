@@ -482,3 +482,42 @@ fn assistant_generates_previews_and_accepts() {
     h.run_steps(2);
     assert_eq!(h.state_mut().session().document().features.len(), 1, "reject changes nothing");
 }
+
+/// Phase 6: an add-in's feature shows up in the toolbar group of its placement, opens a dialog
+/// generated from its schema, and lands on the timeline; Shift+S opens Scripts and Add-Ins.
+#[test]
+fn gear_addin_button_dialog_and_timeline() {
+    let gear = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/plugins/gear");
+    let opts = AppOptions { plugin_dirs: vec![gear], ..AppOptions::default() };
+    let mut app = FormCraftApp::with_state(Layout::default(), Camera::home(), opts);
+    app.start_plugins(false);
+    assert!(app.session.registry().get("gear.spur").is_some(), "{}", app.status);
+    let mut h = Harness::builder().with_size(SIZE).build_ui_state(|ui, app: &mut FormCraftApp| app.draw(ui), app);
+    h.run_steps(3);
+    // the toolbar button (placement Solid › Create, pinned)
+    use egui_kittest::kittest::Queryable;
+    h.get_by_label("Spur Gear").click();
+    h.run_steps(3);
+    assert_eq!(h.state().dialog.as_ref().map(|d| d.command.as_str()), Some("gear.spur"));
+    {
+        let d = h.state_mut().dialog.as_mut().unwrap();
+        d.set_text("teeth", "20".into());
+        d.set_text("module", "2".into());
+        d.set_text("bore", "8".into());
+    }
+    h.state_mut().dialog_ok();
+    h.run_steps(3);
+    let doc = h.state_mut().session().document().clone();
+    assert_eq!(doc.features.last().map(|f| f.name.as_str()), Some("Spur Gear1"));
+    assert_eq!(h.state_mut().session().model().bodies.len(), 1);
+    // Shift+S
+    h.event(Event::Key {
+        key: egui::Key::S,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: Modifiers::SHIFT,
+    });
+    h.run_steps(2);
+    assert!(h.state().addins.open);
+}

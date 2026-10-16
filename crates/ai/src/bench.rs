@@ -179,7 +179,14 @@ pub fn run_case(g: &Generator, case: &Case) -> CaseResult {
     };
     let base = Session::new();
     let req = AiRequest { prompt: case.prompt.clone(), use_selection: false };
-    match g.generate(&base, &req, &mut |_| {}, &AtomicBool::new(false)) {
+    let mut out = g.generate(&base, &req, &mut |_| {}, &AtomicBool::new(false));
+    if let Err(crate::pipeline::AiError::Backend(e)) = &out {
+        // the local server may have restarted its model runner: one more try
+        r.notes.push(format!("retry after backend error: {e}"));
+        std::thread::sleep(std::time::Duration::from_secs(15));
+        out = g.generate(&base, &req, &mut |_| {}, &AtomicBool::new(false));
+    }
+    match out {
         Err(e) => r.notes.push(e.to_string()),
         Ok(p) => {
             r.attempts = p.attempts.len();

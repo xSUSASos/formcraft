@@ -4,6 +4,7 @@
 //!  [--text-commands] [--view top|front|right|home] [--control PORT]`
 //!
 //! `--control PORT` serves the loopback control channel for `formcraft-cli mcp --port PORT`.
+//! `--plugin DIR` loads an add-in folder (development); `--scripts DIR` lists scripts from DIR.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::process::ExitCode;
@@ -29,6 +30,20 @@ fn main() -> ExitCode {
             "--dialog" => opts.dialog = args.next(),
             "--edit" => opts.edit = args.next(),
             "--overlay" => opts.overlay = args.next(),
+            "--plugin" => match args.next() {
+                Some(d) => opts.plugin_dirs.push(d.into()),
+                None => {
+                    eprintln!("--plugin needs a folder with plugin.toml");
+                    return ExitCode::FAILURE;
+                }
+            },
+            "--scripts" => match args.next() {
+                Some(d) => opts.script_dirs.push(d.into()),
+                None => {
+                    eprintln!("--scripts needs a folder");
+                    return ExitCode::FAILURE;
+                }
+            },
             "--control" => match args.next().and_then(|p| p.parse::<u16>().ok()) {
                 Some(p) => opts.control = Some(p),
                 None => {

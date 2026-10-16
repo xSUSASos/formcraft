@@ -315,3 +315,28 @@ fn bench_scores_with_an_oracle_and_rejects_wrong_shapes() {
     assert_eq!(report.valid_pct, 100.0);
     assert_eq!(report.matched_pct, 0.0);
 }
+
+/// Failure modes seen in ai-bench with qwen2.5-coder:7b.
+#[test]
+fn bench_failure_modes_are_handled() {
+    // valid JSON followed by junk
+    let junk = format!("{GOOD}}}\n// done");
+    assert_eq!(plan::parse(&junk).unwrap().summary, "Plate 40x30");
+    // feature.edit is not offered while the design is empty
+    let s = Session::new();
+    assert!(!prompt::system_prompt_for(s.registry(), false).contains("feature.edit"));
+    assert!(prompt::system_prompt_for(s.registry(), true).contains("feature.edit"));
+    let ids =
+        prompt::output_schema_for(s.registry(), false)["properties"]["steps"]["items"]["properties"]["command"]["enum"]
+            .clone();
+    assert!(!ids.as_array().unwrap().contains(&json!("feature.edit")));
+    // a plan with only a sketch is sent back for repair
+    let sketch_only = r#"{"summary": "Plate", "steps": [{"command": "sketch.create", "params": {"rectangles": [{"corner": [0, 0], "size": [10, 10]}]}}]}"#;
+    let (mock, g) = generator(Mock::replies([sketch_only, GOOD]));
+    let p = g
+        .generate(&s, &AiRequest { prompt: "plate".into(), use_selection: false }, &mut |_| {}, &AtomicBool::new(false))
+        .unwrap();
+    assert_eq!(p.attempts.len(), 2);
+    let reqs = mock.requests.lock().unwrap();
+    assert!(reqs[1].messages.last().unwrap().content.contains("no solid body"));
+}

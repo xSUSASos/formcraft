@@ -103,6 +103,12 @@ impl Session {
         Self::with_kernel(Arc::new(formcraft_occt::Occt))
     }
 
+    /// Same as [`Session::new`]: built-in commands only (the assistant and add-ins are added
+    /// by their crates).
+    pub fn new_bare() -> Self {
+        Self::new()
+    }
+
     pub fn with_kernel(kernel: Arc<dyn kernel::Kernel>) -> Self {
         let mut s = Session {
             kernel,

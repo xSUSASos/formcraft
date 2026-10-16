@@ -85,7 +85,16 @@ pub fn parse(text: &str) -> Result<Plan, PlanError> {
                     .map_err(|e| whole(format!("the plan does not match the format: {e}")));
             }
             Ok(_) => {}
-            Err(e) => last_err = format!("invalid JSON: {e}"),
+            Err(e) => {
+                // a valid value followed by junk (`}}`, a comment): take the first value
+                let first =
+                    t.get(a..).and_then(|rest| serde_json::Deserializer::from_str(rest).into_iter::<Value>().next());
+                if let Some(Ok(v @ Value::Object(_))) = first {
+                    return serde_json::from_value(v)
+                        .map_err(|e| whole(format!("the plan does not match the format: {e}")));
+                }
+                last_err = format!("invalid JSON: {e}");
+            }
         }
     }
     Err(whole(last_err))

@@ -27,6 +27,11 @@ pub struct Headless {
 }
 
 impl Headless {
+    /// A headless backend on a prepared session (e.g. with add-ins loaded).
+    pub fn with_session(session: Session) -> Self {
+        Headless { session, renderer: None }
+    }
+
     pub fn new() -> Self {
         let mut session = Session::new();
         if let Err(e) = formcraft_ai::install(&mut session, &formcraft_ai::AiConfig::from_env()) {

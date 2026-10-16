@@ -86,7 +86,8 @@ impl Generator {
 
     /// The conversation for the first attempt.
     pub fn messages(&self, base: &Session, req: &AiRequest) -> Vec<Message> {
-        let mut m = vec![Message::system(prompt::system_prompt(base.registry()))];
+        let has = !base.document().features.is_empty();
+        let mut m = vec![Message::system(prompt::system_prompt_for(base.registry(), has))];
         for ex in fewshot::pick(&req.prompt, self.fewshot) {
             m.push(Message::user(ex.prompt.clone()));
             m.push(Message::assistant(serde_json::to_string(&ex.plan).unwrap_or_default()));
@@ -112,7 +113,7 @@ impl Generator {
         }
         let start = Instant::now();
         let mut messages = self.messages(base, req);
-        let schema = prompt::output_schema(base.registry());
+        let schema = prompt::output_schema_for(base.registry(), !base.document().features.is_empty());
         let of = self.max_attempts.max(1);
         let mut attempts = Vec::new();
         let mut last = String::new();
@@ -145,7 +146,22 @@ impl Generator {
             let tried = plan::parse(&reply.text).and_then(|p| {
                 let mut preview = base.fork();
                 let label = format!("AI: {}", p.summary.trim());
-                plan::apply(&mut preview, &p, &label).map(|added| (p, preview, added))
+                let added = plan::apply(&mut preview, &p, &label)?;
+                // a plan that leaves no solid (only sketches) did not make a part
+                let solid = preview
+                    .model()
+                    .bodies
+                    .iter()
+                    .any(|b| preview.kernel().mass_props(&b.shape).is_ok_and(|m| m.volume > 1e-9));
+                if !solid {
+                    return Err(plan::PlanError {
+                        step: 0,
+                        command: String::new(),
+                        message: "the plan made no solid body: extrude or revolve the sketch, or use solid.box / solid.cylinder"
+                            .into(),
+                    });
+                }
+                Ok((p, preview, added))
             });
             let secs = t.elapsed().as_secs_f64();
             match tried {

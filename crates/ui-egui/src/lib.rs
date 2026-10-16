@@ -9,6 +9,7 @@
     clippy::unreachable
 )]
 
+pub mod addins;
 mod app;
 pub mod assistant;
 pub mod control;

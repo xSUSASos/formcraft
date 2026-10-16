@@ -24,6 +24,8 @@ Rules:
 - Faces and edges are chosen with selectors (see below), never by index.
 - Keep it simple: the fewest features that give the requested shape. Never add features that were not asked for (no fillets, chamfers or extra holes unless the request mentions them).
 - A disc or flange is a circle sketch extruded (or solid.cylinder); a plate is a rectangle sketch extruded (or solid.box).
+- `target` of join/cut is an existing body name (Body1, Body2...) or is left out: then the latest body is used. Never invent body names.
+- Every part must end as a solid body: a sketch alone is not a part; extrude or revolve it.
 - If a step fails, change only what the error is about and keep the rest of the plan.";
 
 /// Compact one-line-per-property rendering of a JSON schema (small models read this better
@@ -82,9 +84,19 @@ pub fn ai_commands(r: &Registry) -> Vec<&CommandSpec> {
     r.specs().filter(|s| s.ai).collect()
 }
 
+/// Commands offered for this request: `feature.edit` only when there is something to edit
+/// (small models otherwise reach for it while building a new part).
+pub fn offered(r: &Registry, has_features: bool) -> Vec<&CommandSpec> {
+    ai_commands(r).into_iter().filter(|s| has_features || s.id != "feature.edit").collect()
+}
+
 pub fn catalog(r: &Registry) -> String {
+    catalog_of(&ai_commands(r))
+}
+
+fn catalog_of(specs: &[&CommandSpec]) -> String {
     let mut out = String::new();
-    for spec in ai_commands(r) {
+    for spec in specs {
         out.push_str(&format!("\n{} — {}\n", spec.id, spec.description));
         render_props(&spec.params, 2, &mut out);
     }
@@ -100,12 +112,20 @@ pub fn selectors_help() -> String {
 }
 
 pub fn system_prompt(r: &Registry) -> String {
-    format!("{RULES}\n\nCommands:{}\n{}", catalog(r), selectors_help())
+    system_prompt_for(r, true)
+}
+
+pub fn system_prompt_for(r: &Registry, has_features: bool) -> String {
+    format!("{RULES}\n\nCommands:{}\n{}", catalog_of(&offered(r, has_features)), selectors_help())
 }
 
 /// JSON schema of a plan (for structured output). Command ids are an enum of the AI commands.
 pub fn output_schema(r: &Registry) -> Value {
-    let ids: Vec<&str> = ai_commands(r).iter().map(|s| s.id.as_str()).collect();
+    output_schema_for(r, true)
+}
+
+pub fn output_schema_for(r: &Registry, has_features: bool) -> Value {
+    let ids: Vec<&str> = offered(r, has_features).iter().map(|s| s.id.as_str()).collect();
     json!({
         "type": "object",
         "required": ["summary", "parameters", "steps"],
