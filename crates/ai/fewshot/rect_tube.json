@@ -1,0 +1,56 @@
+{
+  "prompt": "квадратная труба 30 x 30 со стенкой 2 и длиной 200",
+  "plan": {
+    "summary": "Square tube 30x30x2, L200",
+    "parameters": [
+      {
+        "name": "tube_a",
+        "expression": 30
+      },
+      {
+        "name": "wall",
+        "expression": 2
+      },
+      {
+        "name": "tube_len",
+        "expression": 200
+      }
+    ],
+    "steps": [
+      {
+        "command": "sketch.create",
+        "params": {
+          "plane": "XY",
+          "rectangles": [
+            {
+              "center": [
+                0,
+                0
+              ],
+              "size": [
+                "tube_a",
+                "tube_a"
+              ]
+            },
+            {
+              "center": [
+                0,
+                0
+              ],
+              "size": [
+                "tube_a - 2 * wall",
+                "tube_a - 2 * wall"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "command": "solid.extrude",
+        "params": {
+          "distance": "tube_len"
+        }
+      }
+    ]
+  }
+}

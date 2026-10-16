@@ -1,0 +1,59 @@
+{
+  "prompt": "square spacer 20 x 20, 8 mm tall, 6.5 mm hole in the centre",
+  "plan": {
+    "summary": "Square spacer 20x20x8, hole D6.5",
+    "parameters": [
+      {
+        "name": "spacer_a",
+        "expression": 20
+      },
+      {
+        "name": "spacer_h",
+        "expression": 8
+      },
+      {
+        "name": "hole_d",
+        "expression": 6.5
+      }
+    ],
+    "steps": [
+      {
+        "command": "sketch.create",
+        "params": {
+          "plane": "XY",
+          "rectangles": [
+            {
+              "center": [
+                0,
+                0
+              ],
+              "size": [
+                "spacer_a",
+                "spacer_a"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "command": "solid.extrude",
+        "params": {
+          "distance": "spacer_h"
+        }
+      },
+      {
+        "command": "solid.hole",
+        "params": {
+          "diameter": "hole_d",
+          "points": [
+            [
+              0,
+              0,
+              "spacer_h"
+            ]
+          ]
+        }
+      }
+    ]
+  }
+}

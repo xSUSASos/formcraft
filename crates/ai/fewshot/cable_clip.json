@@ -1,0 +1,70 @@
+{
+  "prompt": "кабельный зажим: кольцо наружным диаметром 16, внутренним 10, шириной 12, с прорезью 6 мм сверху",
+  "plan": {
+    "summary": "Cable clip D16/D10 x 12",
+    "parameters": [
+      {
+        "name": "outer_d",
+        "expression": 16
+      },
+      {
+        "name": "inner_d",
+        "expression": 10
+      },
+      {
+        "name": "clip_w",
+        "expression": 12
+      },
+      {
+        "name": "gap_w",
+        "expression": 6
+      }
+    ],
+    "steps": [
+      {
+        "command": "sketch.create",
+        "params": {
+          "plane": "XY",
+          "circles": [
+            {
+              "center": [
+                0,
+                0
+              ],
+              "diameter": "outer_d"
+            },
+            {
+              "center": [
+                0,
+                0
+              ],
+              "diameter": "inner_d"
+            }
+          ]
+        }
+      },
+      {
+        "command": "solid.extrude",
+        "params": {
+          "distance": "clip_w"
+        }
+      },
+      {
+        "command": "solid.box",
+        "params": {
+          "operation": "cut",
+          "corner": [
+            "-gap_w / 2",
+            0,
+            -1
+          ],
+          "size": [
+            "gap_w",
+            "outer_d / 2 + 1",
+            "clip_w + 2"
+          ]
+        }
+      }
+    ]
+  }
+}

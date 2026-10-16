@@ -1,0 +1,72 @@
+{
+  "prompt": "pulley: bore 10, rim D50, 16 wide, V-groove 4 deep in the middle",
+  "plan": {
+    "summary": "V-pulley D50, bore D10",
+    "parameters": [
+      {
+        "name": "bore_d",
+        "expression": 10
+      },
+      {
+        "name": "rim_d",
+        "expression": 50
+      },
+      {
+        "name": "pulley_w",
+        "expression": 16
+      },
+      {
+        "name": "groove_depth",
+        "expression": 4
+      }
+    ],
+    "steps": [
+      {
+        "command": "sketch.create",
+        "params": {
+          "plane": "XZ",
+          "polylines": [
+            {
+              "points": [
+                [
+                  "bore_d / 2",
+                  0
+                ],
+                [
+                  "rim_d / 2",
+                  0
+                ],
+                [
+                  "rim_d / 2",
+                  "pulley_w / 2 - 3"
+                ],
+                [
+                  "rim_d / 2 - groove_depth",
+                  "pulley_w / 2"
+                ],
+                [
+                  "rim_d / 2",
+                  "pulley_w / 2 + 3"
+                ],
+                [
+                  "rim_d / 2",
+                  "pulley_w"
+                ],
+                [
+                  "bore_d / 2",
+                  "pulley_w"
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "command": "solid.revolve",
+        "params": {
+          "axis": "Z"
+        }
+      }
+    ]
+  }
+}

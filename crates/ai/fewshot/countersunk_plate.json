@@ -1,0 +1,76 @@
+{
+  "prompt": "plate 70 x 40 x 5 with four countersunk M4 holes (head 9 mm, 90 degrees), 8 mm from the edges",
+  "plan": {
+    "summary": "Plate 70x40x5, 4 countersunk M4",
+    "parameters": [
+      {
+        "name": "plate_l",
+        "expression": 70
+      },
+      {
+        "name": "plate_w",
+        "expression": 40
+      },
+      {
+        "name": "plate_t",
+        "expression": 5
+      },
+      {
+        "name": "margin",
+        "expression": 8
+      },
+      {
+        "name": "hole_d",
+        "expression": 4.5
+      },
+      {
+        "name": "csk_d",
+        "expression": 9
+      }
+    ],
+    "steps": [
+      {
+        "command": "solid.box",
+        "params": {
+          "size": [
+            "plate_l",
+            "plate_w",
+            "plate_t"
+          ]
+        }
+      },
+      {
+        "command": "solid.hole",
+        "params": {
+          "diameter": "hole_d",
+          "countersink": {
+            "diameter": "csk_d",
+            "angle": 90
+          },
+          "points": [
+            [
+              "margin",
+              "margin",
+              "plate_t"
+            ],
+            [
+              "plate_l - margin",
+              "margin",
+              "plate_t"
+            ],
+            [
+              "plate_l - margin",
+              "plate_w - margin",
+              "plate_t"
+            ],
+            [
+              "margin",
+              "plate_w - margin",
+              "plate_t"
+            ]
+          ]
+        }
+      }
+    ]
+  }
+}

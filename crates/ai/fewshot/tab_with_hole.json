@@ -1,0 +1,64 @@
+{
+  "prompt": "tab 40 x 20 x 5, all vertical edges R4, one D8 hole 10 mm from the end",
+  "plan": {
+    "summary": "Tab 40x20x5 with D8 hole",
+    "parameters": [
+      {
+        "name": "tab_l",
+        "expression": 40
+      },
+      {
+        "name": "tab_w",
+        "expression": 20
+      },
+      {
+        "name": "tab_t",
+        "expression": 5
+      },
+      {
+        "name": "corner_r",
+        "expression": 4
+      },
+      {
+        "name": "hole_d",
+        "expression": 8
+      },
+      {
+        "name": "hole_x",
+        "expression": 10
+      }
+    ],
+    "steps": [
+      {
+        "command": "solid.box",
+        "params": {
+          "size": [
+            "tab_l",
+            "tab_w",
+            "tab_t"
+          ]
+        }
+      },
+      {
+        "command": "solid.fillet",
+        "params": {
+          "edges": "vertical",
+          "radius": "corner_r"
+        }
+      },
+      {
+        "command": "solid.hole",
+        "params": {
+          "diameter": "hole_d",
+          "points": [
+            [
+              "hole_x",
+              "tab_w / 2",
+              "tab_t"
+            ]
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "prompt": "гайка М8: размер под ключ 13, высота 6.5, отверстие 6.8",
+  "plan": {
+    "summary": "Hex nut M8 (AF13 x 6.5)",
+    "parameters": [
+      {
+        "name": "across_flats",
+        "expression": 13
+      },
+      {
+        "name": "nut_h",
+        "expression": 6.5
+      },
+      {
+        "name": "thread_d",
+        "expression": 6.8,
+        "comment": "M8 tap drill"
+      }
+    ],
+    "steps": [
+      {
+        "command": "sketch.create",
+        "params": {
+          "plane": "XY",
+          "polylines": [
+            {
+              "points": [
+                [
+                  7.506,
+                  0
+                ],
+                [
+                  3.753,
+                  6.5
+                ],
+                [
+                  -3.753,
+                  6.5
+                ],
+                [
+                  -7.506,
+                  0
+                ],
+                [
+                  -3.753,
+                  -6.5
+                ],
+                [
+                  3.753,
+                  -6.5
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "command": "solid.extrude",
+        "params": {
+          "distance": "nut_h"
+        }
+      },
+      {
+        "command": "solid.hole",
+        "params": {
+          "diameter": "thread_d",
+          "points": [
+            [
+              0,
+              0,
+              "nut_h"
+            ]
+          ]
+        }
+      }
+    ]
+  }
+}

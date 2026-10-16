@@ -121,6 +121,10 @@ pub struct FormCraftApp {
     discard_armed: bool,
     /// Regen-error toast: (document revision it belongs to, shown until this time).
     toast: Option<(u64, f64)>,
+    /// The AI assistant panel and its background jobs.
+    assistant: crate::assistant::Assistant,
+    /// Body tint of the assistant's preview: (entry, body → colour).
+    ai_tint: Option<(usize, std::collections::HashMap<u64, Color32>)>,
 }
 
 /// Marks screenshots requested through the control channel.
@@ -166,11 +170,12 @@ impl FormCraftApp {
     /// App without eframe storage (tests and headless use).
     pub fn with_state(layout: Layout, camera: Camera, options: AppOptions) -> Self {
         let mut session = Session::new();
-        let ai_status = match formcraft_ai::install(&mut session, &formcraft_ai::AiConfig::from_env()) {
-            Ok(_) => None,
-            Err(e) => Some(format!("Assistant unavailable: {e}")),
+        let (generator, ai_status) = match formcraft_ai::install(&mut session, &formcraft_ai::AiConfig::from_env()) {
+            Ok(g) => (Some(g), None),
+            Err(e) => (None, Some(format!("Assistant unavailable: {e}"))),
         };
         let mut app = Self::with_state_and_session(layout, camera, options, session);
+        app.assistant.generator = generator;
         if let Some(s) = ai_status {
             app.status = s;
         }
@@ -222,6 +227,8 @@ impl FormCraftApp {
             fonts_installed: false,
             discard_armed: false,
             toast: None,
+            assistant: crate::assistant::Assistant::new(None),
+            ai_tint: None,
         };
         if let Some(path) = app.options.script.clone() {
             app.run_script_file(&path);
@@ -286,6 +293,113 @@ impl FormCraftApp {
     /// Open the dialog of command `id` with initial parameters (screenshots).
     pub(crate) fn open_dialog_with(&mut self, id: &str, initial: &Value) {
         self.open_dialog(id, initial, None);
+    }
+
+    /// The generator used by the assistant (screenshots and tests use a mock).
+    pub fn set_generator(&mut self, g: std::sync::Arc<formcraft_ai::Generator>) {
+        self.assistant.generator = Some(g);
+    }
+
+    /// Show a finished proposal in the assistant (screenshots, tests).
+    pub(crate) fn push_proposal(&mut self, prompt: &str, p: formcraft_ai::Proposal) {
+        self.assistant.entries.push(crate::assistant::Entry {
+            prompt: prompt.to_string(),
+            state: crate::assistant::EntryState::Proposal(Box::new(p)),
+        });
+        self.layout.assistant.open = true;
+    }
+
+    /// Open the assistant panel (and check the model status once).
+    fn open_assistant(&mut self, use_selection: bool) {
+        self.layout.assistant.open = true;
+        self.assistant.use_selection = use_selection;
+        self.assistant.focus_input = true;
+        self.assistant.refresh_status();
+    }
+
+    /// The assistant card, its background work and Accept / Reject.
+    fn assistant_panel(&mut self, ui: &mut Ui, t: &Tokens) {
+        if self.assistant.poll() {
+            self.ai_tint = None;
+        }
+        if self.assistant.busy() {
+            ui.ctx().request_repaint_after(std::time::Duration::from_millis(100));
+        }
+        if !self.layout.assistant.open {
+            return;
+        }
+        let top = self.canvas_rect.top() + SIZE.viewcube + SIZE.card_margin * 6.0;
+        let right = self.canvas_rect.right() - SIZE.card_margin;
+        let mut open = true;
+        let mut action = crate::assistant::AssistantAction::None;
+        egui::Window::new("Assistant")
+            .id(Id::new("assistant"))
+            .title_bar(false)
+            .frame(crate::theme::card(t))
+            .default_pos(pos2(right - SIZE.assistant_w, top))
+            .resizable(false)
+            .show(ui.ctx(), |ui| action = self.assistant.ui(ui, &self.session, t, &mut open));
+        if !open {
+            self.layout.assistant.open = false;
+        }
+        match action {
+            crate::assistant::AssistantAction::None => {}
+            crate::assistant::AssistantAction::Reject(i) => {
+                if let Some(e) = self.assistant.entries.get_mut(i) {
+                    e.state = crate::assistant::EntryState::Rejected;
+                }
+                self.ai_tint = None;
+                self.status = "AI proposal rejected".into();
+            }
+            crate::assistant::AssistantAction::Accept(i) => {
+                let plan = match self.assistant.entries.get(i).map(|e| &e.state) {
+                    Some(crate::assistant::EntryState::Proposal(p)) => p.plan.clone(),
+                    _ => return,
+                };
+                let label = format!("AI: {}", plan.summary.trim());
+                let was_empty = self.session.model().bodies.is_empty();
+                let state = match formcraft_ai::plan::apply(&mut self.session, &plan, &label) {
+                    Ok(added) => {
+                        self.status = format!("{label} — {} feature(s)", added.len());
+                        crate::assistant::EntryState::Accepted(format!("{} feature(s) added as one group", added.len()))
+                    }
+                    Err(e) => crate::assistant::EntryState::Failed(e.to_string()),
+                };
+                if let Some(e) = self.assistant.entries.get_mut(i) {
+                    e.state = state;
+                }
+                self.ai_tint = None;
+                if was_empty {
+                    self.fit();
+                }
+            }
+        }
+    }
+
+    /// The model to show and the tint: the dialog preview first, else the AI proposal.
+    fn ai_preview(&mut self, t: &Tokens) -> Option<(formcraft_engine::regen::Model, u64)> {
+        let (i, p) = self.assistant.pending()?;
+        let model = p.preview.model().clone();
+        if self.ai_tint.as_ref().is_none_or(|(e, _)| *e != i) {
+            // new bodies and bodies the plan changed are tinted with the AI colour (§2.3)
+            let k = self.session.kernel().clone();
+            let mut tint = std::collections::HashMap::new();
+            for b in &model.bodies {
+                let before = self.session.model().body(b.id);
+                let changed = match before {
+                    None => true,
+                    Some(old) => {
+                        let v = |s: &formcraft_kernel::Shape| k.mass_props(s).map(|m| m.volume).unwrap_or(f64::NAN);
+                        (v(&old.shape) - v(&b.shape)).abs() > 1e-9
+                    }
+                };
+                if changed {
+                    tint.insert(b.id.0 as u64, t.ai);
+                }
+            }
+            self.ai_tint = Some((i, tint));
+        }
+        Some((model, u64::MAX / 2 + i as u64))
     }
 
     /// Frame the visible bodies (screenshots).
@@ -457,6 +571,10 @@ impl FormCraftApp {
             }
             "tools.settings" => {
                 self.status = "Preferences: theme and layout are in the View menu".into();
+                return;
+            }
+            "ai.generate" if params.is_null() => {
+                self.open_assistant(false);
                 return;
             }
             _ => {}
@@ -664,7 +782,12 @@ impl FormCraftApp {
                 }
                 Some(menus::MenuAction::Dialog(id, initial)) => {
                     self.marking = None;
-                    self.open_dialog(&id, &initial, None);
+                    if id == "ai.generate" {
+                        let sel = initial.get("use_selection").and_then(Value::as_bool).unwrap_or(false);
+                        self.open_assistant(sel);
+                    } else {
+                        self.open_dialog(&id, &initial, None);
+                    }
                 }
                 Some(menus::MenuAction::Close) if !self.marking_fresh => self.marking = None,
                 Some(menus::MenuAction::Close) => {}
@@ -675,7 +798,10 @@ impl FormCraftApp {
         if let Some((mut text, at)) = self.search.take() {
             match menus::shortcut_box(ui, t, &self.session, &mut text, at, &mut self.layout.favorites) {
                 Some(menus::BoxAction::Run(id)) => self.run(&id, Value::Null),
-                Some(menus::BoxAction::Ai(prompt)) => self.run("ai.generate", serde_json::json!({"prompt": prompt})),
+                Some(menus::BoxAction::Ai(prompt)) => {
+                    self.open_assistant(false);
+                    self.assistant.start(&self.session, prompt, false);
+                }
                 Some(menus::BoxAction::Close) => {}
                 None => self.search = Some((text, at)),
             }
@@ -946,10 +1072,10 @@ impl FormCraftApp {
                             self.run("tools.settings", Value::Null);
                         }
                         if self.appbar_button(ui, t, "ai", "Assistant (describe a part to build)", true).clicked() {
-                            self.layout.assistant.open = !self.layout.assistant.open;
-                            if self.search.is_none() {
-                                self.search =
-                                    Some((String::new(), self.canvas_rect.center_top() + Vec2::new(0.0, 40.0)));
+                            if self.layout.assistant.open {
+                                self.layout.assistant.open = false;
+                            } else {
+                                self.open_assistant(false);
                             }
                         }
                         if self.appbar_button(ui, t, "search", "Search commands (S)", true).clicked() {
@@ -1352,12 +1478,15 @@ impl FormCraftApp {
                 } else {
                     self.session.execute("feature.params", &json!({"feature": id.0}))
                 };
-                self.status = match r {
+                match r {
                     Ok(v) => {
-                        v.get("message").and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| v.to_string())
+                        let text =
+                            v.get("text").and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| v.to_string());
+                        self.assistant.note("Explain", text);
+                        self.layout.assistant.open = true;
                     }
-                    Err(e) => e.to_string(),
-                };
+                    Err(e) => self.status = e.to_string(),
+                }
             }
         }
     }
@@ -1505,11 +1634,13 @@ impl FormCraftApp {
 
         self.navigate(ui, &resp, rect, size);
 
+        let ai = if self.preview.is_none() { self.ai_preview(t) } else { None };
         if self.preview.is_none() {
-            // no preview → no operation tint (every path that drops the preview lands here)
-            self.viewport.set_tint(Default::default());
+            // no dialog preview → the AI proposal's tint, or none
+            let tint = if ai.is_some() { self.ai_tint.as_ref().map(|(_, m)| m.clone()) } else { None };
+            self.viewport.set_tint(tint.unwrap_or_default());
         }
-        let shown = self.preview.as_ref().map(|(m, k)| (m, *k));
+        let shown = self.preview.as_ref().map(|(m, k)| (m, *k)).or(ai.as_ref().map(|(m, k)| (m, *k)));
         // Bodies, grid and axes on the GPU (with depth); without a GPU (tests) the grid is
         // painted in 2D below.
         let gpu = self.viewport.paint(
@@ -1961,6 +2092,7 @@ impl FormCraftApp {
         if self.sketch_mode.is_some() {
             self.sketch_palette(ui, &t);
         }
+        self.assistant_panel(ui, &t);
         self.error_toast(ui, &t);
         self.handle_screenshot(ui);
     }

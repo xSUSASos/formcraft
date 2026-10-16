@@ -1,0 +1,84 @@
+{
+  "prompt": "stepped shaft: D30 x 40, then D20 x 50, then D12 x 25, all on one axis",
+  "plan": {
+    "summary": "Stepped shaft D30/D20/D12",
+    "parameters": [
+      {
+        "name": "d1",
+        "expression": 30
+      },
+      {
+        "name": "l1",
+        "expression": 40
+      },
+      {
+        "name": "d2",
+        "expression": 20
+      },
+      {
+        "name": "l2",
+        "expression": 50
+      },
+      {
+        "name": "d3",
+        "expression": 12
+      },
+      {
+        "name": "l3",
+        "expression": 25
+      }
+    ],
+    "steps": [
+      {
+        "command": "sketch.create",
+        "params": {
+          "plane": "XZ",
+          "polylines": [
+            {
+              "points": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  "d1 / 2",
+                  0
+                ],
+                [
+                  "d1 / 2",
+                  "l1"
+                ],
+                [
+                  "d2 / 2",
+                  "l1"
+                ],
+                [
+                  "d2 / 2",
+                  "l1 + l2"
+                ],
+                [
+                  "d3 / 2",
+                  "l1 + l2"
+                ],
+                [
+                  "d3 / 2",
+                  "l1 + l2 + l3"
+                ],
+                [
+                  0,
+                  "l1 + l2 + l3"
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "command": "solid.revolve",
+        "params": {
+          "axis": "Z"
+        }
+      }
+    ]
+  }
+}

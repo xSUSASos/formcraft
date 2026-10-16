@@ -1,0 +1,54 @@
+{
+  "prompt": "труба наружным диаметром 40 со стенкой 3 и длиной 120",
+  "plan": {
+    "summary": "Pipe D40, wall 3, length 120",
+    "parameters": [
+      {
+        "name": "pipe_od",
+        "expression": 40
+      },
+      {
+        "name": "wall",
+        "expression": 3
+      },
+      {
+        "name": "pipe_id",
+        "expression": "pipe_od - 2 * wall"
+      },
+      {
+        "name": "pipe_len",
+        "expression": 120
+      }
+    ],
+    "steps": [
+      {
+        "command": "sketch.create",
+        "params": {
+          "plane": "XY",
+          "circles": [
+            {
+              "center": [
+                0,
+                0
+              ],
+              "diameter": "pipe_od"
+            },
+            {
+              "center": [
+                0,
+                0
+              ],
+              "diameter": "pipe_id"
+            }
+          ]
+        }
+      },
+      {
+        "command": "solid.extrude",
+        "params": {
+          "distance": "pipe_len"
+        }
+      }
+    ]
+  }
+}

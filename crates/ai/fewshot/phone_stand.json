@@ -1,0 +1,78 @@
+{
+  "prompt": "phone stand: 70 mm wide, 80 mm deep base 5 thick, back rest 60 mm long tilted 70 degrees from the base",
+  "plan": {
+    "summary": "Phone stand 70 wide",
+    "parameters": [
+      {
+        "name": "stand_w",
+        "expression": 70
+      },
+      {
+        "name": "base_d",
+        "expression": 80
+      },
+      {
+        "name": "t",
+        "expression": 5
+      },
+      {
+        "name": "rest_len",
+        "expression": 60
+      },
+      {
+        "name": "tilt",
+        "expression": 70,
+        "comment": "deg from the base"
+      }
+    ],
+    "steps": [
+      {
+        "command": "sketch.create",
+        "params": {
+          "plane": "XZ",
+          "polylines": [
+            {
+              "points": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  "base_d",
+                  0
+                ],
+                [
+                  "base_d",
+                  "t"
+                ],
+                [
+                  "base_d - 5 - rest_len * cos(tilt) + 5",
+                  "t + rest_len * sin(tilt)"
+                ],
+                [
+                  "base_d - 5 - rest_len * cos(tilt) + 5 - t",
+                  "t + rest_len * sin(tilt)"
+                ],
+                [
+                  "base_d - 5 - rest_len * cos(tilt)",
+                  "t"
+                ],
+                [
+                  0,
+                  "t"
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "command": "solid.extrude",
+        "params": {
+          "distance": "stand_w",
+          "direction": "symmetric"
+        }
+      }
+    ]
+  }
+}

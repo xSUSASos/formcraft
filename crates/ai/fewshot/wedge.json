@@ -1,0 +1,52 @@
+{
+  "prompt": "wedge: base 50, height 20, width 30, right-angle triangle profile",
+  "plan": {
+    "summary": "Wedge 50x20x30",
+    "parameters": [
+      {
+        "name": "base_l",
+        "expression": 50
+      },
+      {
+        "name": "wedge_h",
+        "expression": 20
+      },
+      {
+        "name": "wedge_w",
+        "expression": 30
+      }
+    ],
+    "steps": [
+      {
+        "command": "sketch.create",
+        "params": {
+          "plane": "XY",
+          "polylines": [
+            {
+              "points": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  "base_l",
+                  0
+                ],
+                [
+                  0,
+                  "wedge_h"
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "command": "solid.extrude",
+        "params": {
+          "distance": "wedge_w"
+        }
+      }
+    ]
+  }
+}

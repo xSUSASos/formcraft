@@ -1,0 +1,58 @@
+{
+  "prompt": "заготовка шестерни: диск D60 толщиной 10, ступица D25 высотой 20 от низа, отверстие под вал 10",
+  "plan": {
+    "summary": "Gear blank D60x10 with hub D25x20",
+    "parameters": [
+      {
+        "name": "blank_d",
+        "expression": 60
+      },
+      {
+        "name": "blank_t",
+        "expression": 10
+      },
+      {
+        "name": "hub_d",
+        "expression": 25
+      },
+      {
+        "name": "hub_h",
+        "expression": 20
+      },
+      {
+        "name": "bore_d",
+        "expression": 10
+      }
+    ],
+    "steps": [
+      {
+        "command": "solid.cylinder",
+        "params": {
+          "diameter": "blank_d",
+          "height": "blank_t"
+        }
+      },
+      {
+        "command": "solid.cylinder",
+        "params": {
+          "operation": "join",
+          "diameter": "hub_d",
+          "height": "hub_h"
+        }
+      },
+      {
+        "command": "solid.hole",
+        "params": {
+          "diameter": "bore_d",
+          "points": [
+            [
+              0,
+              0,
+              "hub_h"
+            ]
+          ]
+        }
+      }
+    ]
+  }
+}

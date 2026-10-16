@@ -1,0 +1,96 @@
+{
+  "prompt": "пластина 90 x 50 x 4, шесть отверстий D5 сеткой 3 x 2 с шагом 30 и 25, сетка по центру",
+  "plan": {
+    "summary": "Plate 90x50x4, 3x2 holes D5",
+    "parameters": [
+      {
+        "name": "plate_l",
+        "expression": 90
+      },
+      {
+        "name": "plate_w",
+        "expression": 50
+      },
+      {
+        "name": "plate_t",
+        "expression": 4
+      },
+      {
+        "name": "pitch_x",
+        "expression": 30
+      },
+      {
+        "name": "pitch_y",
+        "expression": 25
+      },
+      {
+        "name": "hole_d",
+        "expression": 5
+      }
+    ],
+    "steps": [
+      {
+        "command": "sketch.create",
+        "params": {
+          "plane": "XY",
+          "rectangles": [
+            {
+              "corner": [
+                0,
+                0
+              ],
+              "size": [
+                "plate_l",
+                "plate_w"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "command": "solid.extrude",
+        "params": {
+          "distance": "plate_t"
+        }
+      },
+      {
+        "command": "solid.hole",
+        "params": {
+          "diameter": "hole_d",
+          "points": [
+            [
+              "plate_l / 2 - pitch_x",
+              "plate_w / 2 - pitch_y / 2",
+              "plate_t"
+            ],
+            [
+              "plate_l / 2",
+              "plate_w / 2 - pitch_y / 2",
+              "plate_t"
+            ],
+            [
+              "plate_l / 2 + pitch_x",
+              "plate_w / 2 - pitch_y / 2",
+              "plate_t"
+            ],
+            [
+              "plate_l / 2 - pitch_x",
+              "plate_w / 2 + pitch_y / 2",
+              "plate_t"
+            ],
+            [
+              "plate_l / 2",
+              "plate_w / 2 + pitch_y / 2",
+              "plate_t"
+            ],
+            [
+              "plate_l / 2 + pitch_x",
+              "plate_w / 2 + pitch_y / 2",
+              "plate_t"
+            ]
+          ]
+        }
+      }
+    ]
+  }
+}

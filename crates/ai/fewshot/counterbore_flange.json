@@ -1,0 +1,88 @@
+{
+  "prompt": "фланец D100, толщина 10, четыре отверстия М6 на окружности 70 с цековкой D11 глубиной 6",
+  "plan": {
+    "summary": "Flange D100x10, 4 x M6 counterbored on D70",
+    "parameters": [
+      {
+        "name": "flange_d",
+        "expression": 100
+      },
+      {
+        "name": "flange_t",
+        "expression": 10
+      },
+      {
+        "name": "bolt_circle_d",
+        "expression": 70
+      },
+      {
+        "name": "hole_d",
+        "expression": 6.6,
+        "comment": "M6 clearance"
+      },
+      {
+        "name": "cbore_d",
+        "expression": 11
+      },
+      {
+        "name": "cbore_depth",
+        "expression": 6
+      }
+    ],
+    "steps": [
+      {
+        "command": "sketch.create",
+        "params": {
+          "plane": "XY",
+          "circles": [
+            {
+              "center": [
+                0,
+                0
+              ],
+              "diameter": "flange_d"
+            }
+          ]
+        }
+      },
+      {
+        "command": "solid.extrude",
+        "params": {
+          "distance": "flange_t"
+        }
+      },
+      {
+        "command": "solid.hole",
+        "params": {
+          "diameter": "hole_d",
+          "counterbore": {
+            "diameter": "cbore_d",
+            "depth": "cbore_depth"
+          },
+          "points": [
+            [
+              "bolt_circle_d / 2",
+              0,
+              "flange_t"
+            ],
+            [
+              0,
+              "bolt_circle_d / 2",
+              "flange_t"
+            ],
+            [
+              "-bolt_circle_d / 2",
+              0,
+              "flange_t"
+            ],
+            [
+              0,
+              "-bolt_circle_d / 2",
+              "flange_t"
+            ]
+          ]
+        }
+      }
+    ]
+  }
+}

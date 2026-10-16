@@ -1,0 +1,82 @@
+{
+  "prompt": "монтажная пластина 80 x 30 x 5 с продолговатым пазом 40 x 8 по центру (скруглённые концы)",
+  "plan": {
+    "summary": "Plate 80x30x5 with 40x8 slot",
+    "parameters": [
+      {
+        "name": "plate_l",
+        "expression": 80
+      },
+      {
+        "name": "plate_w",
+        "expression": 30
+      },
+      {
+        "name": "plate_t",
+        "expression": 5
+      },
+      {
+        "name": "slot_l",
+        "expression": 40
+      },
+      {
+        "name": "slot_w",
+        "expression": 8
+      }
+    ],
+    "steps": [
+      {
+        "command": "solid.box",
+        "params": {
+          "size": [
+            "plate_l",
+            "plate_w",
+            "plate_t"
+          ]
+        }
+      },
+      {
+        "command": "solid.box",
+        "params": {
+          "operation": "cut",
+          "corner": [
+            "(plate_l - slot_l) / 2 + slot_w / 2",
+            "(plate_w - slot_w) / 2",
+            -1
+          ],
+          "size": [
+            "slot_l - slot_w",
+            "slot_w",
+            "plate_t + 2"
+          ]
+        }
+      },
+      {
+        "command": "solid.cylinder",
+        "params": {
+          "operation": "cut",
+          "base": [
+            "(plate_l - slot_l) / 2 + slot_w / 2",
+            "plate_w / 2",
+            -1
+          ],
+          "diameter": "slot_w",
+          "height": "plate_t + 2"
+        }
+      },
+      {
+        "command": "solid.cylinder",
+        "params": {
+          "operation": "cut",
+          "base": [
+            "(plate_l + slot_l) / 2 - slot_w / 2",
+            "plate_w / 2",
+            -1
+          ],
+          "diameter": "slot_w",
+          "height": "plate_t + 2"
+        }
+      }
+    ]
+  }
+}

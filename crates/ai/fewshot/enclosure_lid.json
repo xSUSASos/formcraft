@@ -1,0 +1,81 @@
+{
+  "prompt": "крышка корпуса 100 x 60, толщина 3, внутренний бортик по периметру высотой 4 и толщиной 2 (внутри корпуса со стенкой 2)",
+  "plan": {
+    "summary": "Enclosure lid 100x60 with lip",
+    "parameters": [
+      {
+        "name": "lid_l",
+        "expression": 100
+      },
+      {
+        "name": "lid_w",
+        "expression": 60
+      },
+      {
+        "name": "lid_t",
+        "expression": 3
+      },
+      {
+        "name": "wall",
+        "expression": 2,
+        "comment": "wall of the enclosure"
+      },
+      {
+        "name": "lip_h",
+        "expression": 4
+      },
+      {
+        "name": "lip_t",
+        "expression": 2
+      }
+    ],
+    "steps": [
+      {
+        "command": "solid.box",
+        "params": {
+          "size": [
+            "lid_l",
+            "lid_w",
+            "lid_t"
+          ]
+        }
+      },
+      {
+        "command": "sketch.create",
+        "params": {
+          "plane": "XY",
+          "offset": "lid_t",
+          "rectangles": [
+            {
+              "corner": [
+                "wall",
+                "wall"
+              ],
+              "size": [
+                "lid_l - 2 * wall",
+                "lid_w - 2 * wall"
+              ]
+            },
+            {
+              "corner": [
+                "wall + lip_t",
+                "wall + lip_t"
+              ],
+              "size": [
+                "lid_l - 2 * wall - 2 * lip_t",
+                "lid_w - 2 * wall - 2 * lip_t"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "command": "solid.extrude",
+        "params": {
+          "distance": "lip_h",
+          "operation": "join"
+        }
+      }
+    ]
+  }
+}

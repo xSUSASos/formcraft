@@ -424,3 +424,61 @@ fn every_spec_scene_renders() {
         }
     }
 }
+
+/// The assistant: a request runs in the background, the proposal is previewed, Accept adds one
+/// grouped undo step, Reject changes nothing.
+#[test]
+fn assistant_generates_previews_and_accepts() {
+    let reply = r#"{"summary": "Plate 40x30", "parameters": [{"name": "plate_t", "expression": 4}],
+        "steps": [{"command": "solid.box", "params": {"size": [40, 30, "plate_t"]}}]}"#;
+    let mut g = formcraft_ai::Generator::new(std::sync::Arc::new(formcraft_ai::Mock::replies([reply, reply])));
+    g.log = false;
+    let mut h = harness();
+    h.state_mut().set_generator(std::sync::Arc::new(g));
+    let run_until = |h: &mut Harness<'_, FormCraftApp>, f: &dyn Fn(&FormCraftApp) -> bool| {
+        let start = std::time::Instant::now();
+        while !f(h.state()) && start.elapsed() < std::time::Duration::from_secs(30) {
+            h.step();
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    };
+    // S-box "Сделать с ИИ" path
+    {
+        let app = h.state_mut();
+        app.open_assistant(false);
+        let s = app.session.fork();
+        app.assistant.start(&s, "a plate".into(), false);
+    }
+    run_until(&mut h, &|a| a.assistant.pending().is_some());
+    assert!(h.state().assistant.pending().is_some(), "proposal arrives");
+    h.run_steps(2);
+    assert!(h.state_mut().session().document().features.is_empty(), "nothing applied before Accept");
+    assert!(h.state().ai_tint.as_ref().is_some_and(|(_, m)| !m.is_empty()), "preview is tinted");
+    // Accept
+    let i = h.state().assistant.pending().map(|(i, _)| i).unwrap();
+    {
+        let app = h.state_mut();
+        let crate::assistant::EntryState::Proposal(p) = &app.assistant.entries[i].state else {
+            panic!("expected a proposal");
+        };
+        let plan = p.plan.clone();
+        formcraft_ai::plan::apply(&mut app.session, &plan, "AI: Plate 40x30").unwrap();
+        app.assistant.entries[i].state = crate::assistant::EntryState::Accepted("ok".into());
+    }
+    h.run_steps(2);
+    let d = h.state_mut().session().document().clone();
+    assert_eq!(d.features.len(), 1);
+    assert!(d.features[0].group.is_some());
+    assert_eq!(h.state_mut().session().undo_label(), Some("AI: Plate 40x30"));
+    // a second request, rejected
+    {
+        let app = h.state_mut();
+        let s = app.session.fork();
+        app.assistant.start(&s, "another".into(), false);
+    }
+    run_until(&mut h, &|a| a.assistant.pending().is_some());
+    let i = h.state().assistant.pending().map(|(i, _)| i).unwrap();
+    h.state_mut().assistant.entries[i].state = crate::assistant::EntryState::Rejected;
+    h.run_steps(2);
+    assert_eq!(h.state_mut().session().document().features.len(), 1, "reject changes nothing");
+}

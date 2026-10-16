@@ -1,0 +1,42 @@
+{
+  "prompt": "standoff D8, 15 mm tall, with a 3 mm through hole",
+  "plan": {
+    "summary": "Standoff D8x15, hole D3",
+    "parameters": [
+      {
+        "name": "standoff_d",
+        "expression": 8
+      },
+      {
+        "name": "standoff_h",
+        "expression": 15
+      },
+      {
+        "name": "hole_d",
+        "expression": 3
+      }
+    ],
+    "steps": [
+      {
+        "command": "solid.cylinder",
+        "params": {
+          "diameter": "standoff_d",
+          "height": "standoff_h"
+        }
+      },
+      {
+        "command": "solid.hole",
+        "params": {
+          "diameter": "hole_d",
+          "points": [
+            [
+              0,
+              0,
+              "standoff_h"
+            ]
+          ]
+        }
+      }
+    ]
+  }
+}

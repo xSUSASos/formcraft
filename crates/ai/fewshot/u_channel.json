@@ -1,0 +1,76 @@
+{
+  "prompt": "U-канал: ширина 40, высота 30, стенка 3, длина 100",
+  "plan": {
+    "summary": "U-channel 40x30x100, wall 3",
+    "parameters": [
+      {
+        "name": "channel_w",
+        "expression": 40
+      },
+      {
+        "name": "channel_h",
+        "expression": 30
+      },
+      {
+        "name": "wall",
+        "expression": 3
+      },
+      {
+        "name": "channel_len",
+        "expression": 100
+      }
+    ],
+    "steps": [
+      {
+        "command": "sketch.create",
+        "params": {
+          "plane": "XY",
+          "polylines": [
+            {
+              "points": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  "channel_w",
+                  0
+                ],
+                [
+                  "channel_w",
+                  "channel_h"
+                ],
+                [
+                  "channel_w - wall",
+                  "channel_h"
+                ],
+                [
+                  "channel_w - wall",
+                  "wall"
+                ],
+                [
+                  "wall",
+                  "wall"
+                ],
+                [
+                  "wall",
+                  "channel_h"
+                ],
+                [
+                  0,
+                  "channel_h"
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "command": "solid.extrude",
+        "params": {
+          "distance": "channel_len"
+        }
+      }
+    ]
+  }
+}

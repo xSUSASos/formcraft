@@ -1,0 +1,54 @@
+{
+  "prompt": "enclosure box 100 x 60 x 40 with 2 mm walls, open top, R4 vertical corners",
+  "plan": {
+    "summary": "Enclosure 100x60x40, wall 2",
+    "parameters": [
+      {
+        "name": "box_l",
+        "expression": 100
+      },
+      {
+        "name": "box_w",
+        "expression": 60
+      },
+      {
+        "name": "box_h",
+        "expression": 40
+      },
+      {
+        "name": "wall",
+        "expression": 2
+      },
+      {
+        "name": "corner_r",
+        "expression": 4
+      }
+    ],
+    "steps": [
+      {
+        "command": "solid.box",
+        "params": {
+          "size": [
+            "box_l",
+            "box_w",
+            "box_h"
+          ]
+        }
+      },
+      {
+        "command": "solid.fillet",
+        "params": {
+          "edges": "vertical",
+          "radius": "corner_r"
+        }
+      },
+      {
+        "command": "solid.shell",
+        "params": {
+          "faces": "top",
+          "thickness": "wall"
+        }
+      }
+    ]
+  }
+}

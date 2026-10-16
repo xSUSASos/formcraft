@@ -1,0 +1,58 @@
+{
+  "prompt": "knob D40, 18 tall, R3 rounded top edge, blind hole D6 for a shaft, 12 deep",
+  "plan": {
+    "summary": "Knob D40x18 with D6 shaft hole",
+    "parameters": [
+      {
+        "name": "knob_d",
+        "expression": 40
+      },
+      {
+        "name": "knob_h",
+        "expression": 18
+      },
+      {
+        "name": "round_r",
+        "expression": 3
+      },
+      {
+        "name": "shaft_d",
+        "expression": 6
+      },
+      {
+        "name": "shaft_depth",
+        "expression": 12
+      }
+    ],
+    "steps": [
+      {
+        "command": "solid.cylinder",
+        "params": {
+          "diameter": "knob_d",
+          "height": "knob_h"
+        }
+      },
+      {
+        "command": "solid.fillet",
+        "params": {
+          "edges": "top_outer",
+          "radius": "round_r"
+        }
+      },
+      {
+        "command": "solid.hole",
+        "params": {
+          "diameter": "shaft_d",
+          "depth": "shaft_depth",
+          "points": [
+            [
+              0,
+              0,
+              "knob_h"
+            ]
+          ]
+        }
+      }
+    ]
+  }
+}

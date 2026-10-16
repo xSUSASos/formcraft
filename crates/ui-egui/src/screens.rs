@@ -109,6 +109,22 @@ pub fn render(scene: &str, theme: ThemeKind, size: [u32; 2]) -> Result<image::Rg
     if scene != "4-sketch" {
         app.fit_view();
     }
+    if scene == "7-ai-group" {
+        // an AI proposal waiting in the Assistant (mock backend: deterministic)
+        let reply = r#"{"summary": "4 x M5 corner holes", "parameters": [{"name": "margin", "expression": 8}],
+            "steps": [{"command": "solid.hole", "params": {"diameter": 5.5,
+              "points": [["margin", "margin", 5], ["L - margin", "margin", 5], ["L - margin", "40 - margin", 5], ["margin", "40 - margin", 5]]}}]}"#;
+        let mut g = formcraft_ai::Generator::new(std::sync::Arc::new(formcraft_ai::Mock::replies([reply])));
+        g.log = false;
+        let g = std::sync::Arc::new(g);
+        app.set_generator(g.clone());
+        let prompt = "4 holes M5 in the corners, 8 mm from the edges";
+        let req = formcraft_ai::AiRequest { prompt: prompt.into(), use_selection: false };
+        let cancel = std::sync::atomic::AtomicBool::new(false);
+        if let Ok(p) = g.generate(app.session(), &req, &mut |_| {}, &cancel) {
+            app.push_proposal(prompt, p);
+        }
+    }
     if scene == "3-extrude" {
         app.open_dialog_with("solid.extrude", &json!({"distance": 12, "operation": "join", "profiles": [[30, 20]]}));
     }

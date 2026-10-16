@@ -1,0 +1,53 @@
+{
+  "prompt": "вал диаметром 20 и длиной 60 со шпоночным пазом шириной 6 и глубиной 3.5 на 30 мм длины",
+  "plan": {
+    "summary": "Shaft D20x60 with keyway 6x3.5",
+    "parameters": [
+      {
+        "name": "shaft_d",
+        "expression": 20
+      },
+      {
+        "name": "shaft_len",
+        "expression": 60
+      },
+      {
+        "name": "key_w",
+        "expression": 6
+      },
+      {
+        "name": "key_depth",
+        "expression": 3.5
+      },
+      {
+        "name": "key_len",
+        "expression": 30
+      }
+    ],
+    "steps": [
+      {
+        "command": "solid.cylinder",
+        "params": {
+          "diameter": "shaft_d",
+          "height": "shaft_len"
+        }
+      },
+      {
+        "command": "solid.box",
+        "params": {
+          "operation": "cut",
+          "corner": [
+            "-key_w / 2",
+            "shaft_d / 2 - key_depth",
+            "shaft_len - key_len"
+          ],
+          "size": [
+            "key_w",
+            "key_depth + 1",
+            "key_len + 1"
+          ]
+        }
+      }
+    ]
+  }
+}

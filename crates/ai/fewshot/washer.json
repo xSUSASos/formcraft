@@ -1,0 +1,50 @@
+{
+  "prompt": "шайба: наружный диаметр 16, отверстие 8.4, толщина 1.6",
+  "plan": {
+    "summary": "Washer D16/D8.4 x 1.6",
+    "parameters": [
+      {
+        "name": "outer_d",
+        "expression": 16
+      },
+      {
+        "name": "inner_d",
+        "expression": 8.4
+      },
+      {
+        "name": "washer_t",
+        "expression": 1.6
+      }
+    ],
+    "steps": [
+      {
+        "command": "sketch.create",
+        "params": {
+          "plane": "XY",
+          "circles": [
+            {
+              "center": [
+                0,
+                0
+              ],
+              "diameter": "outer_d"
+            },
+            {
+              "center": [
+                0,
+                0
+              ],
+              "diameter": "inner_d"
+            }
+          ]
+        }
+      },
+      {
+        "command": "solid.extrude",
+        "params": {
+          "distance": "washer_t"
+        }
+      }
+    ]
+  }
+}

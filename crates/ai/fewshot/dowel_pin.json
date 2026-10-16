@@ -1,0 +1,36 @@
+{
+  "prompt": "dowel pin D6, 30 long, 0.5 mm chamfer on both ends",
+  "plan": {
+    "summary": "Dowel pin D6x30",
+    "parameters": [
+      {
+        "name": "pin_d",
+        "expression": 6
+      },
+      {
+        "name": "pin_len",
+        "expression": 30
+      },
+      {
+        "name": "chamfer",
+        "expression": 0.5
+      }
+    ],
+    "steps": [
+      {
+        "command": "solid.cylinder",
+        "params": {
+          "diameter": "pin_d",
+          "height": "pin_len"
+        }
+      },
+      {
+        "command": "solid.chamfer",
+        "params": {
+          "edges": "circular",
+          "distance": "chamfer"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "prompt": "L-bracket: legs 60 and 40 mm, 4 mm thick, 25 mm wide, two M4 holes in the base",
+  "plan": {
+    "summary": "L-bracket 60x40x25, t4",
+    "parameters": [
+      {
+        "name": "leg_a",
+        "expression": 60,
+        "comment": "base leg"
+      },
+      {
+        "name": "leg_b",
+        "expression": 40,
+        "comment": "upright leg"
+      },
+      {
+        "name": "t",
+        "expression": 4
+      },
+      {
+        "name": "width",
+        "expression": 25
+      },
+      {
+        "name": "hole_d",
+        "expression": 4.5
+      }
+    ],
+    "steps": [
+      {
+        "command": "sketch.create",
+        "params": {
+          "plane": "XY",
+          "polylines": [
+            {
+              "points": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  "leg_a",
+                  0
+                ],
+                [
+                  "leg_a",
+                  "t"
+                ],
+                [
+                  "t",
+                  "t"
+                ],
+                [
+                  "t",
+                  "leg_b"
+                ],
+                [
+                  0,
+                  "leg_b"
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "command": "solid.extrude",
+        "params": {
+          "distance": "width"
+        }
+      },
+      {
+        "command": "solid.hole",
+        "params": {
+          "diameter": "hole_d",
+          "face": "-Y",
+          "points": [
+            [
+              "leg_a - 10",
+              0,
+              "width / 4"
+            ],
+            [
+              "leg_a - 10",
+              0,
+              "width * 3 / 4"
+            ]
+          ],
+          "depth": "t"
+        }
+      }
+    ]
+  }
+}

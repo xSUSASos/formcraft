@@ -1,0 +1,98 @@
+{
+  "prompt": "T-гайка для паза: ширина полки 20, толщина полки 3, ширина шейки 10, общая высота 8, длина 20, резьба М5 (отверстие 4.2)",
+  "plan": {
+    "summary": "T-slot nut 20x8x20, M5",
+    "parameters": [
+      {
+        "name": "flange_w",
+        "expression": 20
+      },
+      {
+        "name": "flange_t",
+        "expression": 3
+      },
+      {
+        "name": "neck_w",
+        "expression": 10
+      },
+      {
+        "name": "total_h",
+        "expression": 8
+      },
+      {
+        "name": "nut_len",
+        "expression": 20
+      },
+      {
+        "name": "tap_d",
+        "expression": 4.2
+      }
+    ],
+    "steps": [
+      {
+        "command": "sketch.create",
+        "params": {
+          "plane": "XY",
+          "polylines": [
+            {
+              "points": [
+                [
+                  "-flange_w / 2",
+                  0
+                ],
+                [
+                  "flange_w / 2",
+                  0
+                ],
+                [
+                  "flange_w / 2",
+                  "flange_t"
+                ],
+                [
+                  "neck_w / 2",
+                  "flange_t"
+                ],
+                [
+                  "neck_w / 2",
+                  "total_h"
+                ],
+                [
+                  "-neck_w / 2",
+                  "total_h"
+                ],
+                [
+                  "-neck_w / 2",
+                  "flange_t"
+                ],
+                [
+                  "-flange_w / 2",
+                  "flange_t"
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "command": "solid.extrude",
+        "params": {
+          "distance": "nut_len"
+        }
+      },
+      {
+        "command": "solid.hole",
+        "params": {
+          "diameter": "tap_d",
+          "face": "+Y",
+          "points": [
+            [
+              0,
+              "total_h",
+              "nut_len / 2"
+            ]
+          ]
+        }
+      }
+    ]
+  }
+}
