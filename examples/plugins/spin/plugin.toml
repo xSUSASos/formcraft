@@ -1,0 +1,7 @@
+id = "spin"
+name = "Misbehaving test plugin"
+version = "1.0.0"
+license = "MIT OR Apache-2.0"
+description = "Commands that loop forever, eat memory or panic: the host must unload it, not crash."
+api = "1.0"
+wasm = "spin.wasm"

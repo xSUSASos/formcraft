@@ -17,3 +17,10 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 log = { workspace = true }
+formcraft-kernel = { workspace = true }
+wasmtime = { workspace = true }
+wasmtime-wasi = { workspace = true, features = ["p2"] }
+zip = { workspace = true }
+
+[dev-dependencies]
+formcraft-occt = { workspace = true }

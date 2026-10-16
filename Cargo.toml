@@ -42,6 +42,9 @@ occt-sys = "=7.8.1"
 
 # ui
 egui = "0.36"
+toml = { version = "0.9", default-features = false, features = ["parse", "serde"] }
+wasmtime = { version = "49", default-features = false, features = ["runtime", "cranelift", "component-model", "std", "parallel-compilation"] }
+wasmtime-wasi = { version = "49", default-features = false }
 eframe = { version = "0.36", default-features = false, features = ["wgpu", "default_fonts", "persistence", "x11", "wayland"] }
 egui-wgpu = "0.36"
 # must match egui-wgpu's wgpu

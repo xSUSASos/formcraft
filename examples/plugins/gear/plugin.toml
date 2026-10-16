@@ -1,0 +1,12 @@
+id = "gear"
+name = "Spur Gear"
+version = "1.0.0"
+author = "FormCraft examples"
+license = "MIT OR Apache-2.0"
+description = "Involute spur gear as a parametric feature: teeth, module, thickness, bore."
+api = "1.0"
+wasm = "gear.wasm"
+
+[permissions]
+files = []
+network = false

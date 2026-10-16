@@ -1,0 +1,19 @@
+[package]
+name = "formcraft-spin"
+version = "1.0.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "Test plugin that misbehaves (infinite loop, memory hog, panic) to check the sandbox"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.63"
+
+[profile.release]
+opt-level = "s"
+strip = true
+
+[workspace]

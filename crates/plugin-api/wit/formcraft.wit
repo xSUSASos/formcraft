@@ -1,119 +1,97 @@
-// FormCraft Plugin API v1 — draft (ADR 0003). Implemented in Phase 6; until then this file is
-// the design reference and is not compiled.
+// FormCraft Plugin API v1 (ADR 0003). Plugins are WebAssembly components (wasm32-wasip2) built
+// against this world. JSON travels as strings and is validated by the host.
 package formcraft:plugin@1.0.0;
 
-/// Shared value types. JSON travels as strings: command parameters and results are validated
-/// against the command's JSON schema by the host, so plugins and the host agree on one format.
 interface types {
     type json = string;
 
     record vec3 { x: f64, y: f64, z: f64 }
     record point2 { x: f64, y: f64 }
 
-    /// A sketch plane: origin + X and normal directions (Y = normal × X).
+    /// A sketch plane: origin, X direction and normal (Y = normal × X).
     record plane { origin: vec3, x-dir: vec3, normal: vec3 }
 
-    /// One closed loop of 2D segments. Arcs are given by their mid point.
-    variant segment {
-        line(tuple<point2, point2>),
-        arc(tuple<point2, point2, point2>),
+    /// A closed polygon on a plane (counter-clockwise for outer loops); arcs are sampled by the
+    /// plugin into points.
+    type polygon = list<point2>;
+
+    record mass-props { volume: f64, area: f64, bbox-min: vec3, bbox-max: vec3 }
+
+    /// Toolbar placement, e.g. tab "Solid", group "Create".
+    record placement { tab: string, group: string, pinned: bool }
+
+    record command-spec {
+        /// Must start with the plugin id: `gear.something`.
+        id: string,
+        label: string,
+        description: string,
+        /// JSON schema of the parameters (drives the dialog and the AI prompt).
+        params-schema: json,
+        placement: option<placement>,
+        shortcut: option<string>,
+        /// Offer the command to the AI assistant and MCP.
+        ai: bool,
     }
-    type profile-loop = list<segment>;
 
-    enum body-op { new-body, join, cut, intersect }
-
-    record mass-props { volume: f64, area: f64, centroid: vec3, bbox-min: vec3, bbox-max: vec3 }
-
-    enum event-kind { document-opened, document-saved, selection-changed, regen-finished, command-executed }
+    /// A custom feature: the host registers the command `<plugin>.<kind>`; running it adds the
+    /// feature to the timeline, and every rebuild calls the plugin's `regenerate`.
+    record feature-spec {
+        kind: string,
+        label: string,
+        description: string,
+        params-schema: json,
+        placement: option<placement>,
+        ai: bool,
+    }
 }
 
-/// Geometry for custom features. Solids are host resources: the plugin never sees kernel
-/// memory, and every operation is validated (bad geometry is an `err`, never a crash).
+/// Geometry for custom features. Solids are host resources; every operation is validated by
+/// the kernel (bad geometry is an `err`, never a crash).
 interface geometry {
-    use types.{vec3, plane, profile-loop, mass-props};
+    use types.{vec3, plane, polygon, mass-props};
 
     resource solid {
         mass-props: func() -> result<mass-props, string>;
-        /// Translate, then rotate about `axis` through `origin` (degrees).
-        transformed: func(translate: vec3, origin: vec3, axis: vec3, angle-deg: f64) -> result<solid, string>;
+        /// Translate by `offset`, then rotate by `angle-deg` about `axis` through `origin`.
+        transformed: func(offset: vec3, origin: vec3, axis: vec3, angle-deg: f64) -> result<solid, string>;
         fuse: func(other: borrow<solid>) -> result<solid, string>;
         cut: func(tool: borrow<solid>) -> result<solid, string>;
         common: func(other: borrow<solid>) -> result<solid, string>;
-        /// Fillet edges selected by a FormCraft edge selector (JSON, as in `solid.fillet`).
-        fillet: func(edges: string, radius: f64) -> result<solid, string>;
     }
 
     make-box: func(corner: vec3, size: vec3) -> result<solid, string>;
     make-cylinder: func(base: vec3, axis: vec3, radius: f64, height: f64) -> result<solid, string>;
-    /// Extrude closed loops (outer + holes, even-odd) on `p` by `distance` along its normal.
-    extrude: func(p: plane, loops: list<profile-loop>, distance: f64, symmetric: bool) -> result<solid, string>;
-    revolve: func(p: plane, loops: list<profile-loop>, axis-origin: vec3, axis-dir: vec3, angle-deg: f64) -> result<solid, string>;
+    /// Extrude polygons (first = outer, rest = holes) on `p` by `distance` along the normal.
+    extrude: func(p: plane, outer: polygon, holes: list<polygon>, distance: f64) -> result<solid, string>;
 }
 
-/// The host side: everything a plugin may call. Model access goes through commands, exactly
-/// like the UI, AI and MCP do.
+/// What the plugin may call. Model changes go through commands, like the UI, AI and MCP.
 interface host {
-    use types.{json, event-kind};
+    use types.{json};
 
-    /// Run any registered command (built-in or another plugin's). Undoable like a UI action.
+    /// Run a registered command (built-in or another plugin's): `params` is a JSON object.
     execute: func(command: string, params: json) -> result<json, string>;
-    /// `model.inspect` (bodies, features, parameters).
+    /// `model.inspect` as JSON.
     inspect: func() -> json;
-    /// Current selection as selector JSON.
-    selection: func() -> json;
+    /// 0 trace, 1 debug, 2 info, 3 warn, 4 error. Goes to the plugin log.
     log: func(level: u8, message: string);
-    /// Files, only inside folders granted by the manifest and confirmed by the user.
+    /// Files, only inside folders granted in the manifest.
     read-file: func(path: string) -> result<list<u8>, string>;
     write-file: func(path: string, data: list<u8>) -> result<_, string>;
 }
 
-/// What a plugin registers at load time. Everything is data the host validates.
-interface registry {
-    use types.{json, body-op};
-
-    record command-spec {
-        /// Must start with the plugin id: `gear.create`.
-        id: string,
-        label: string,
-        description: string,
-        /// JSON schema of the parameters (also drives the dialog and the AI prompt).
-        params-schema: json,
-        /// Toolbar placement `Solid/Create`, optional shortcut, SVG icon (≤ 64 KiB).
-        placement: option<string>,
-        shortcut: option<string>,
-        icon-svg: option<string>,
-        /// Offer to the AI and MCP (default true).
-        ai: bool,
-    }
-
-    record feature-spec {
-        /// Feature type id, e.g. `gear.spur`; stored in documents.
-        kind: string,
-        label: string,
-        params-schema: json,
-        icon-svg: option<string>,
-        default-op: body-op,
-    }
-
-    record panel-spec { id: string, title: string }
-}
-
 world plugin {
-    use types.{json, event-kind};
-    use registry.{command-spec, feature-spec, panel-spec};
+    use types.{json, command-spec, feature-spec};
+    use geometry.{solid};
 
     import host;
     import geometry;
 
-    /// Called once after load. Returns what to register; the host rejects ids outside the
-    /// plugin's namespace and schemas that do not parse.
-    export init: func() -> result<tuple<list<command-spec>, list<feature-spec>, list<panel-spec>>, string>;
-    /// A registered command was invoked (from UI, shortcut, S-box, AI, MCP, CLI or a script).
+    /// Called once after loading: the commands and features to register.
+    export init: func() -> result<tuple<list<command-spec>, list<feature-spec>>, string>;
+    /// A registered command was invoked (UI, shortcut, S-box, AI, MCP, CLI or a script).
     export run-command: func(id: string, params: json) -> result<json, string>;
-    /// Rebuild a custom feature from its parameters (parameter expressions already evaluated).
-    /// Runs on every regen; must be deterministic.
-    export regenerate: func(kind: string, params: json) -> result<geometry.solid, string>;
-    /// Declarative panel content (same widget JSON as feature dialogs).
-    export panel: func(id: string) -> json;
-    export on-event: func(kind: event-kind, data: json);
+    /// Build a custom feature from its parameters (expressions already evaluated). Must be
+    /// deterministic: it runs on every rebuild.
+    export regenerate: func(kind: string, params: json) -> result<solid, string>;
 }
