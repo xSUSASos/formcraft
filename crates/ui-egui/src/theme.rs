@@ -278,6 +278,8 @@ pub struct Sizes {
     /// Opacity of the selection tint over the body colour (§2.3: 45%).
     pub selected_mix: f32,
     pub hover_mix: f32,
+    /// Operation previews: colour at 50% (§2.3).
+    pub preview_mix: f32,
     pub tooltip_delay: f32,
 }
 
@@ -325,6 +327,7 @@ pub const SIZE: Sizes = Sizes {
     edge_selected_px: 2.5,
     selected_mix: 0.45,
     hover_mix: 0.35,
+    preview_mix: 0.5,
     tooltip_delay: 0.5,
 };
 
@@ -358,4 +361,14 @@ pub fn heading(ctx: &egui::Context) -> FontId {
     let family = FontFamily::Name(SEMIBOLD.into());
     let ready = ctx.fonts(|f| f.families().contains(&family));
     FontId::new(SIZE.font_heading, if ready { family } else { FontFamily::Proportional })
+}
+
+/// A floating card (§2.1 `panel.bg`, `panel.shadow`; §3 radius 6): Browser, dialogs, palettes.
+pub fn card(t: &Tokens) -> egui::Frame {
+    egui::Frame::new()
+        .fill(t.panel_bg)
+        .stroke(Stroke::new(1.0, t.divider))
+        .corner_radius(CornerRadius::same(SIZE.radius_card))
+        .shadow(egui::Shadow { offset: [0, 2], blur: 12, spread: 0, color: t.panel_shadow })
+        .inner_margin(egui::Margin::same((SIZE.grid * 2.0) as i8))
 }

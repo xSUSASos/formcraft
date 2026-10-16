@@ -43,7 +43,6 @@ fn run_steps(app: &mut FormCraftApp, steps: &[(&str, &str)]) -> Result<(), Strin
 fn options(scene: &str, theme: ThemeKind) -> AppOptions {
     let mut o = AppOptions { theme: Some(theme), fresh_layout: true, ..AppOptions::default() };
     match scene {
-        "3-extrude" => o.dialog = Some("solid.extrude".into()),
         "4-sketch" => o.edit = Some("Sketch1".into()),
         "5-marking" => o.overlay = Some("marking".into()),
         "6-shortcut-box" => o.overlay = Some("search:flange 100 with 4 holes".into()),
@@ -67,7 +66,16 @@ pub fn render(scene: &str, theme: ThemeKind, size: [u32; 2]) -> Result<image::Rg
     let mut pre = FormCraftApp::with_state(Layout::default(), Camera::home(), AppOptions::default());
     match scene {
         "1-empty" | "6-shortcut-box" => {}
-        "3-extrude" => run_steps(&mut pre, PLATE.get(..2).unwrap_or_default())?,
+        "3-extrude" => {
+            run_steps(&mut pre, PLATE)?;
+            run_steps(
+                &mut pre,
+                &[(
+                    "sketch.create",
+                    r#"{"plane": {"body": "Body1", "face": "top"}, "circles": [{"center": [30, 20], "diameter": 16}]}"#,
+                )],
+            )?;
+        }
         "7-ai-group" => {
             run_steps(&mut pre, PLATE.get(..1).unwrap_or_default())?;
             pre.session()
@@ -100,6 +108,9 @@ pub fn render(scene: &str, theme: ThemeKind, size: [u32; 2]) -> Result<image::Rg
     );
     if scene != "4-sketch" {
         app.fit_view();
+    }
+    if scene == "3-extrude" {
+        app.open_dialog_with("solid.extrude", &json!({"distance": 12, "operation": "join", "profiles": [[30, 20]]}));
     }
     app.set_render_state(rs.clone());
     let mut h = Harness::builder()

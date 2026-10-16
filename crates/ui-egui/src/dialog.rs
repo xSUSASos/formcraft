@@ -2,12 +2,13 @@
 //! expressions (`L*2`); OK runs the command (or `feature.edit` when editing), Cancel discards.
 //! While open, the canvas shows a live preview of the result.
 
-use egui::{Color32, RichText, Ui};
+use egui::{Color32, CornerRadius, Rect, RichText, Sense, Ui, Vec2};
 use formcraft_engine::doc::FeatureId;
 use formcraft_engine::{Pick, Session};
 use serde_json::{Map, Value, json};
 
-use crate::theme::Tokens;
+use crate::icons;
+use crate::theme::{SIZE, Tokens};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Kind {
@@ -259,8 +260,11 @@ impl FeatureDialog {
         self.error = None;
     }
 
+    /// The dialog body (UI_SPEC.md §5.8): header with icon, caps title and "?", rows with a
+    /// 110px label column, a grey hint and OK / Cancel at the bottom.
     pub fn ui(&mut self, ui: &mut Ui, s: &Session, t: &Tokens) -> Outcome {
         let mut outcome = Outcome::None;
+        let g = SIZE.grid;
         let bodies: Vec<(String, String)> =
             s.model().bodies.iter().map(|b| (b.id.0.to_string(), b.name.clone())).collect();
         let sketches: Vec<(String, String)> = s
@@ -270,87 +274,177 @@ impl FeatureDialog {
             .filter(|f| matches!(f.kind, formcraft_engine::doc::FeatureKind::Sketch { .. }))
             .map(|f| (f.id.0.to_string(), f.name.clone()))
             .collect();
+        let spec = s.registry().get(&self.command).map(|c| c.spec.clone());
+        let icon = spec.as_ref().and_then(|c| c.icon.clone()).unwrap_or_else(|| "plugin".into());
+        let description = spec.as_ref().map(|c| c.description.clone()).unwrap_or_default();
+        ui.set_width(SIZE.dialog_w - g * 4.0);
+        // Header.
+        ui.horizontal(|ui| {
+            let (r, _) = ui.allocate_exact_size(Vec2::splat(SIZE.icon_menu + g), Sense::hover());
+            icons::paint(ui.painter(), r, &icon, t.icon_outline, t);
+            ui.label(
+                RichText::new(self.title.to_uppercase())
+                    .font(crate::theme::heading(ui.ctx()))
+                    .extra_letter_spacing(SIZE.group_letter_spacing)
+                    .color(t.text_primary),
+            );
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if icons::button(ui, t, "close", "Cancel (Esc)", SIZE.icon_menu + g, true, false).clicked() {
+                    outcome = Outcome::Cancel;
+                }
+                if icons::button(ui, t, "help", "Help", SIZE.icon_menu + g, true, false)
+                    .on_hover_text(&description)
+                    .clicked()
+                {
+                    // the tooltip is the help
+                }
+            });
+        });
+        let r = ui.cursor();
+        ui.painter().hline(r.x_range(), r.top(), egui::Stroke::new(1.0, t.divider));
+        ui.add_space(g * 2.0);
         let mut use_sel = None;
-        egui::Grid::new("feature_dialog_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
-            for (i, f) in self.fields.iter_mut().enumerate() {
-                let label = if f.required { RichText::new(&f.label).strong() } else { RichText::new(&f.label) };
-                ui.label(label).on_hover_text(&f.help);
-                match &f.kind {
+        let control_w = SIZE.dialog_w - g * 4.0 - SIZE.dialog_label_w - g * 2.0;
+        for (i, f) in self.fields.iter_mut().enumerate() {
+            ui.horizontal(|ui| {
+                let (lr, lresp) = ui.allocate_exact_size(Vec2::new(SIZE.dialog_label_w, SIZE.input_h), Sense::hover());
+                let font = egui::FontId::proportional(SIZE.font_panel);
+                let color = if f.required { t.text_primary } else { t.text_secondary };
+                ui.painter().text(lr.left_center(), egui::Align2::LEFT_CENTER, &f.label, font, color);
+                if !f.help.is_empty() {
+                    lresp.on_hover_text(&f.help);
+                }
+                ui.allocate_ui(Vec2::new(control_w, SIZE.input_h), |ui| match &f.kind {
                     Kind::Bool => {
                         ui.checkbox(&mut f.flag, "");
                     }
                     Kind::Vec3 => {
+                        let w = (control_w - g * 2.0) / 3.0;
                         ui.horizontal(|ui| {
+                            ui.spacing_mut().item_spacing.x = g;
                             for v in &mut f.vec {
-                                ui.add(egui::TextEdit::singleline(v).desired_width(52.0));
+                                ui.add(egui::TextEdit::singleline(v).desired_width(w - g));
                             }
                         });
                     }
                     Kind::Choice(opts) => {
-                        egui::ComboBox::from_id_salt(("choice", i)).selected_text(&f.text).show_ui(ui, |ui| {
-                            for o in opts {
-                                ui.selectable_value(&mut f.text, o.clone(), o);
-                            }
-                        });
+                        let shown = pretty(&f.text);
+                        egui::ComboBox::from_id_salt(("choice", i)).width(control_w).selected_text(shown).show_ui(
+                            ui,
+                            |ui| {
+                                for o in opts {
+                                    ui.horizontal(|ui| {
+                                        if let Some(c) = op_color(o, t) {
+                                            let (r, _) = ui
+                                                .allocate_exact_size(Vec2::splat(SIZE.icon_menu / 1.5), Sense::hover());
+                                            ui.painter().rect_filled(r, CornerRadius::same(SIZE.radius_input), c);
+                                        }
+                                        ui.selectable_value(&mut f.text, o.clone(), pretty(o));
+                                    });
+                                }
+                            },
+                        );
+                        if let Some(c) = op_color(&f.text, t) {
+                            let r = ui.min_rect();
+                            ui.painter().rect_filled(
+                                Rect::from_min_size(r.left_bottom() - Vec2::new(0.0, 2.0), Vec2::new(r.width(), 2.0)),
+                                CornerRadius::ZERO,
+                                c,
+                            );
+                        }
                     }
                     Kind::Body | Kind::Sketch => {
                         let list = if f.kind == Kind::Body { &bodies } else { &sketches };
                         let fallback = if f.text.is_empty() { "(default)".to_string() } else { f.text.clone() };
                         let found = list.iter().find(|(id, _)| *id == f.text).map(|(_, n)| n.clone());
                         let shown = found.unwrap_or(fallback);
-                        egui::ComboBox::from_id_salt(("pick", i)).selected_text(shown).show_ui(ui, |ui| {
-                            if !f.required {
-                                ui.selectable_value(&mut f.text, String::new(), "(default)");
-                            }
-                            for (id, name) in list {
-                                ui.selectable_value(&mut f.text, id.clone(), name);
-                            }
-                        });
+                        egui::ComboBox::from_id_salt(("pick", i)).width(control_w).selected_text(shown).show_ui(
+                            ui,
+                            |ui| {
+                                if !f.required {
+                                    ui.selectable_value(&mut f.text, String::new(), "(default)");
+                                }
+                                for (id, name) in list {
+                                    ui.selectable_value(&mut f.text, id.clone(), name);
+                                }
+                            },
+                        );
                     }
                     Kind::Faces | Kind::Edges => {
+                        // Selection field: "Select" takes the canvas selection, a counter, ✕ clears.
                         ui.horizontal(|ui| {
-                            let short = if f.text.len() > 28 { "(selection)".to_string() } else { f.text.clone() };
-                            let mut shown = short.clone();
-                            let r = ui
-                                .add(egui::TextEdit::singleline(&mut shown).desired_width(130.0).hint_text("e.g. top"));
+                            ui.spacing_mut().item_spacing.x = g;
+                            let picked = !f.text.is_empty();
+                            let stroke = egui::Stroke::new(1.0, if picked { t.accent } else { t.divider });
+                            let b = egui::Button::new(RichText::new("Select").size(SIZE.font_panel))
+                                .stroke(stroke)
+                                .corner_radius(CornerRadius::same(SIZE.radius_input));
+                            if ui.add(b).on_hover_text("Use the faces/edges selected on the canvas").clicked() {
+                                use_sel = Some(i);
+                            }
+                            let mut shown = if f.text.starts_with('{') || f.text.starts_with('[') {
+                                selection_count(&f.text)
+                            } else {
+                                f.text.clone()
+                            };
+                            let hint = if f.kind == Kind::Faces { "e.g. top" } else { "e.g. vertical" };
+                            let r = ui.add(
+                                egui::TextEdit::singleline(&mut shown)
+                                    .desired_width(control_w - g * 22.0)
+                                    .hint_text(hint),
+                            );
                             if r.changed() {
                                 f.text = shown;
                             }
-                            if ui
-                                .small_button("Use")
-                                .on_hover_text("Use the faces/edges selected on the canvas")
-                                .clicked()
-                            {
-                                use_sel = Some(i);
+                            if picked && icons::button(ui, t, "close", "Clear", SIZE.icon_menu, true, false).clicked() {
+                                f.text.clear();
                             }
                         });
                     }
                     Kind::Expr | Kind::Text | Kind::Json => {
-                        ui.add(egui::TextEdit::singleline(&mut f.text).desired_width(170.0));
+                        let unit = unit_of(&f.key, &f.kind);
+                        ui.horizontal(|ui| {
+                            let w = if unit.is_empty() { control_w } else { control_w - g * 8.0 };
+                            ui.add(egui::TextEdit::singleline(&mut f.text).desired_width(w));
+                            if !unit.is_empty() {
+                                ui.label(RichText::new(unit).color(t.text_secondary));
+                            }
+                        });
                     }
-                }
-                ui.end_row();
-            }
-        });
+                });
+            });
+            ui.add_space(g / 2.0);
+        }
         if let Some(i) = use_sel {
             self.use_selection(i, s);
         }
         if let Some(e) = &self.error {
-            ui.add_space(4.0);
+            ui.add_space(g);
             ui.label(RichText::new(e).color(t.error));
         }
-        ui.add_space(6.0);
-        ui.horizontal(|ui| {
-            let ok = ui.add(
-                egui::Button::new(RichText::new("OK").color(Color32::WHITE))
-                    .fill(t.accent)
-                    .min_size(egui::vec2(70.0, 24.0)),
-            );
-            if ok.clicked() {
-                outcome = Outcome::Ok;
-            }
-            if ui.add(egui::Button::new("Cancel").min_size(egui::vec2(70.0, 24.0))).clicked() {
+        ui.add_space(g * 2.0);
+        let hint = description.split(". ").next().unwrap_or("").trim_end_matches('.').to_string();
+        if !hint.is_empty() {
+            ui.label(RichText::new(hint).size(SIZE.font_group + 1.0).color(t.text_secondary));
+            ui.add_space(g * 2.0);
+        }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let size = Vec2::new(g * 18.0, SIZE.input_h + g);
+            let radius = CornerRadius::same(SIZE.radius_button);
+            let cancel = egui::Button::new(RichText::new("Cancel").color(t.text_primary))
+                .fill(Color32::TRANSPARENT)
+                .stroke(egui::Stroke::new(1.0, t.divider))
+                .corner_radius(radius)
+                .min_size(size);
+            if ui.add(cancel).clicked() {
                 outcome = Outcome::Cancel;
+            }
+            let ok = egui::Button::new(RichText::new("OK").strong().color(Color32::WHITE))
+                .fill(t.accent)
+                .corner_radius(radius)
+                .min_size(size);
+            if ui.add(ok).on_hover_text("OK (Enter)").clicked() {
+                outcome = Outcome::Ok;
             }
         });
         if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
@@ -360,6 +454,47 @@ impl FeatureDialog {
             outcome = Outcome::Ok;
         }
         outcome
+    }
+}
+
+/// `new_body` → "New Body", `one_side` → "One side".
+pub fn pretty(v: &str) -> String {
+    match v {
+        "new_body" => "New Body".into(),
+        "join" => "Join".into(),
+        "cut" => "Cut".into(),
+        "intersect" => "Intersect".into(),
+        other => label_of(other),
+    }
+}
+
+/// Body operations are colour-coded like their previews (§2.3, §5.8).
+pub fn op_color(v: &str, t: &Tokens) -> Option<Color32> {
+    match v {
+        "join" => Some(t.preview_join),
+        "cut" => Some(t.preview_cut),
+        "new_body" => Some(t.preview_new),
+        "intersect" => Some(t.accent),
+        _ => None,
+    }
+}
+
+fn unit_of(key: &str, kind: &Kind) -> &'static str {
+    if *kind != Kind::Expr {
+        return "";
+    }
+    if key.contains("angle") {
+        return "deg";
+    }
+    let mm = ["distance", "radius", "diameter", "depth", "height", "thickness", "offset", "length", "width", "size"];
+    if mm.iter().any(|k| key.contains(k)) { "mm" } else { "" }
+}
+
+fn selection_count(text: &str) -> String {
+    match serde_json::from_str::<Value>(text) {
+        Ok(Value::Array(a)) => format!("{} selected", a.len()),
+        Ok(_) => "1 selected".into(),
+        Err(_) => text.to_string(),
     }
 }
 

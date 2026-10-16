@@ -116,13 +116,23 @@ pub fn feature(d: &Document, p: &Value, key: &str) -> Result<FeatureId> {
     }
 }
 
-/// `operation` (new_body | join | cut | intersect) with `target` for the last three.
+/// `operation` (new_body | join | cut | intersect) with `target` for the last three. Without a
+/// `target` the latest body on the timeline is used (like Fusion picks the body you work on).
 pub fn body_op(d: &Document, p: &Value) -> Result<BodyOp> {
     let op = opt_str(p, "operation").unwrap_or("new_body");
     if op == "new_body" {
         return Ok(BodyOp::NewBody);
     }
-    let t = body(d, p, "target")?;
+    let t = match p.get("target") {
+        Some(_) => body(d, p, "target")?,
+        None => d
+            .active_features()
+            .iter()
+            .rev()
+            .map(|f| BodyId(f.id.0))
+            .find(|b| d.bodies.contains_key(b))
+            .ok_or_else(|| bad(format!("`{op}` needs a body: there is none yet (use new_body)")))?,
+    };
     match op {
         "join" => Ok(BodyOp::Join(t)),
         "cut" => Ok(BodyOp::Cut(t)),

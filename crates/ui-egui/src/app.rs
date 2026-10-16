@@ -280,6 +280,11 @@ impl FormCraftApp {
         self.viewport = Viewport::new(Some(rs));
     }
 
+    /// Open the dialog of command `id` with initial parameters (screenshots).
+    pub(crate) fn open_dialog_with(&mut self, id: &str, initial: &Value) {
+        self.open_dialog(id, initial, None);
+    }
+
     /// Frame the visible bodies (screenshots).
     pub(crate) fn fit_view(&mut self) {
         self.fit();
@@ -755,9 +760,15 @@ impl FormCraftApp {
         let Some(mut dlg) = self.dialog.take() else { return };
         let mut outcome = Outcome::None;
         let mut open = true;
+        // A card at the right edge of the canvas, below the ViewCube; draggable by its header.
+        let top = self.canvas_rect.top() + SIZE.viewcube + SIZE.card_margin * 6.0;
+        let right = self.canvas_rect.right() - SIZE.card_margin;
         egui::Window::new(dlg.title.clone())
             .id(Id::new("feature_dialog"))
-            .anchor(Align2::RIGHT_TOP, Vec2::new(-12.0, 300.0))
+            .title_bar(false)
+            .frame(crate::theme::card(t))
+            .default_pos(pos2(right - SIZE.dialog_w, top))
+            .fixed_size(Vec2::new(SIZE.dialog_w - SIZE.grid * 4.0, 0.0))
             .resizable(false)
             .collapsible(false)
             .open(&mut open)
@@ -769,6 +780,25 @@ impl FormCraftApp {
             dlg.previewed = Some(params.clone());
             match self.session.preview(&cmd, &params) {
                 Ok(m) => {
+                    // Tint what the operation produces: new bodies and the target body.
+                    let op = params.get("operation").and_then(Value::as_str).unwrap_or("new_body");
+                    let mut tint = std::collections::HashMap::new();
+                    if let Some(c) = crate::dialog::op_color(op, t) {
+                        let before: Vec<u64> = self.session.model().bodies.iter().map(|b| b.id.0 as u64).collect();
+                        for b in &m.bodies {
+                            if !before.contains(&(b.id.0 as u64)) {
+                                tint.insert(b.id.0 as u64, c);
+                            }
+                        }
+                        if op != "new_body" {
+                            let target = params.get("target").and_then(formcraft_engine::params::as_id);
+                            let target = target.map(u64::from).or_else(|| before.last().copied());
+                            if let Some(id) = target {
+                                tint.insert(id, c);
+                            }
+                        }
+                    }
+                    self.viewport.set_tint(tint);
                     self.preview_counter += 1;
                     self.preview = Some((m, u64::MAX - self.preview_counter));
                     dlg.error = None;
@@ -785,6 +815,7 @@ impl FormCraftApp {
                     Ok(v) => {
                         self.status = v.get("message").and_then(Value::as_str).unwrap_or("Done").to_string();
                         self.preview = None;
+                        self.viewport.set_tint(Default::default());
                         return;
                     }
                     Err(e) => dlg.error = Some(e.to_string()),
@@ -793,12 +824,14 @@ impl FormCraftApp {
             },
             Outcome::Cancel => {
                 self.preview = None;
+                self.viewport.set_tint(Default::default());
                 return;
             }
             Outcome::None => {}
         }
         if !open {
             self.preview = None;
+            self.viewport.set_tint(Default::default());
             return;
         }
         self.dialog = Some(dlg);
@@ -1437,6 +1470,10 @@ impl FormCraftApp {
 
         self.navigate(ui, &resp, rect, size);
 
+        if self.preview.is_none() {
+            // no preview → no operation tint (every path that drops the preview lands here)
+            self.viewport.set_tint(Default::default());
+        }
         let shown = self.preview.as_ref().map(|(m, k)| (m, *k));
         // Bodies, grid and axes on the GPU (with depth); without a GPU (tests) the grid is
         // painted in 2D below.

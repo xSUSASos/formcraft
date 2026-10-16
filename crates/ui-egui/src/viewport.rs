@@ -31,6 +31,7 @@ pub struct Viewport {
     painted: Option<(Vec<Pick>, Option<Pick>, u64)>,
     last_size: [u32; 2],
     pub tessellation_error: Option<String>,
+    tint: HashMap<u64, Color32>,
 }
 
 impl Viewport {
@@ -47,6 +48,15 @@ impl Viewport {
             painted: None,
             last_size: [0, 0],
             tessellation_error: None,
+            tint: HashMap::new(),
+        }
+    }
+
+    /// Colour bodies of the preview by operation (§2.3: Join blue, Cut red, New Body green).
+    pub fn set_tint(&mut self, tint: HashMap<u64, Color32>) {
+        if tint != self.tint {
+            self.tint = tint;
+            self.painted = None;
         }
     }
 
@@ -77,7 +87,7 @@ impl Viewport {
             return;
         }
         let Some((_, r)) = self.gpu.as_mut() else { return };
-        let base = rgba(t.body);
+        let tint = self.tint.clone();
         let edge = rgba(t.body_edge);
         // §2.3: selection = accent at 45% over the body, hover = light blue tint
         let selected = rgba(crate::theme::mix(t.body, t.selected_3d, SIZE.selected_mix));
@@ -103,6 +113,10 @@ impl Viewport {
                 } else {
                     None
                 }
+            };
+            let base = match tint.get(key) {
+                Some(c) => rgba(crate::theme::mix(t.body, *c, SIZE.preview_mix)),
+                None => rgba(t.body),
             };
             let (v, i) = scene::mesh_vertices(m, base, &face);
             let e = scene::edge_vertices(m, edge, &edge_c);

@@ -449,3 +449,14 @@ fn fork_is_independent() {
     assert_eq!(s.model().bodies.len(), 1);
     assert!(!f.can_undo() || f.undo_label().is_some());
 }
+
+#[test]
+fn join_without_target_uses_the_latest_body() {
+    let mut s = session();
+    assert!(s.execute("solid.box", &json!({"size": [5, 5, 5], "operation": "join"})).is_err(), "no body yet");
+    s.execute("solid.box", &json!({"size": [10, 10, 10]})).unwrap();
+    s.execute("solid.box", &json!({"corner": [5, 5, 5], "size": [10, 10, 10], "operation": "join"})).unwrap();
+    assert_eq!(s.model().bodies.len(), 1);
+    let v = s.execute("model.inspect", &json!({})).unwrap();
+    assert!((v["bodies"][0]["volume"].as_f64().unwrap() - (2000.0 - 125.0)).abs() < 1e-6);
+}
