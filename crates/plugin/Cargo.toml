@@ -24,3 +24,4 @@ zip = { workspace = true }
 
 [dev-dependencies]
 formcraft-occt = { workspace = true }
+formcraft-ai = { workspace = true }

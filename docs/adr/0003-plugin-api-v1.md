@@ -81,3 +81,22 @@ Python-пакет `formcraft` (чистый Python, stdlib only) — обёрт�
   `crates/plugin-api`, `formcraft-cli plugin new`, Python-пакет и пример «Шестерня».
 - Протокол control channel становится публичным API скриптов — менять только совместимо.
 - wasmtime увеличивает размер бинарника (~10–15 МБ); лицензия Apache-2.0 проходит `cargo deny`.
+
+## Реализация (фаза 6, 2026-10-16) — отличия от черновика
+
+- **WIT v1** (`crates/plugin-api/wit/formcraft.wit`) упрощён по сравнению с черновиком: экспорт
+  `init` / `run-command` / `regenerate`; импорт `host` (execute, inspect, log, read-file,
+  write-file) и `geometry` (ресурс `solid`: mass-props, transformed, fuse, cut, common;
+  make-box, make-cylinder, extrude полигонов). **Панели и события (`panel`, `on-event`) отложены**
+  до API 1.1 — для трёх примеров они не понадобились («Масса по таблице материалов» сделана
+  командой, а не панелью). Добавление экспорта в 1.x — совместимое изменение.
+- **Фичи плагина исполняет хост.** `feature-spec` превращается в команду `<plugin>.<kind>`,
+  которую выполняет хост (`Session::add_custom_feature`), а не `run-command` плагина. Так
+  `regenerate` никогда не вызывается, пока плагин занят — повторного входа в экземпляр нет.
+- **Сессия «одалживается» плагину** на время `run-command` (`std::mem::take`), чтобы
+  `host.execute` работал без `unsafe`; при trap она возвращается.
+- **Скрипты** запускаются из диалога Scripts and Add-Ins (приложение само поднимает control
+  channel на свободном порту и передаёт `FORMCRAFT_PORT`) или против `formcraft --control PORT`.
+  Отдельной команды `formcraft-cli script` нет.
+- Лимиты: 256 МиБ памяти, 2 с на вызов, 10 с на `init`, тик эпохи 10 мс. WASI без файлов,
+  сети и переменных окружения; файлы — только папки из `[permissions] files`.

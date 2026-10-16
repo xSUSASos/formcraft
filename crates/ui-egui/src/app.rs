@@ -508,6 +508,16 @@ impl FormCraftApp {
         Some((model, u64::MAX / 2 + i as u64))
     }
 
+    /// Load this add-in folder when plugins start (screenshots, tests).
+    pub(crate) fn add_plugin_dir(&mut self, dir: PathBuf) {
+        self.options.plugin_dirs.push(dir);
+    }
+
+    /// Show Scripts and Add-Ins (screenshots).
+    pub(crate) fn open_addins(&mut self) {
+        self.addins.open = true;
+    }
+
     /// Frame the visible bodies (screenshots).
     pub(crate) fn fit_view(&mut self) {
         self.fit();

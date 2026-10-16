@@ -22,6 +22,7 @@ pub const SCENES: &[(&str, &str)] = &[
     ("6-shortcut-box", "Shortcut box with the AI line"),
     ("7-ai-group", "AI group on the timeline (+ Assistant panel)"),
     ("8-error", "Feature error on the timeline (+ toast)"),
+    ("9-addins", "Add-in: Spur Gear button and feature, Scripts and Add-Ins dialog"),
 ];
 
 const PLATE: &[(&str, &str)] = &[
@@ -65,7 +66,7 @@ pub fn render(scene: &str, theme: ThemeKind, size: [u32; 2]) -> Result<image::Rg
     // The document is built before the app opens the dialog/sketch from its options.
     let mut pre = FormCraftApp::with_state(Layout::default(), Camera::home(), AppOptions::default());
     match scene {
-        "1-empty" | "6-shortcut-box" => {}
+        "1-empty" | "6-shortcut-box" | "9-addins" => {}
         "3-extrude" => {
             run_steps(&mut pre, PLATE)?;
             run_steps(
@@ -108,6 +109,14 @@ pub fn render(scene: &str, theme: ThemeKind, size: [u32; 2]) -> Result<image::Rg
     );
     if scene != "4-sketch" {
         app.fit_view();
+    }
+    if scene == "9-addins" {
+        let gear = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/plugins/gear");
+        app.add_plugin_dir(gear);
+        app.start_plugins(false);
+        let _ = app.session().execute("gear.spur", &json!({"teeth": 24, "module": 2.5, "thickness": 12, "bore": 10}));
+        app.fit_view();
+        app.open_addins();
     }
     if scene == "7-ai-group" {
         // an AI proposal waiting in the Assistant (mock backend: deterministic)

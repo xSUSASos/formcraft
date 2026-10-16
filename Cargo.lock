@@ -1786,6 +1786,7 @@ dependencies = [
 name = "formcraft-plugin"
 version = "0.1.0"
 dependencies = [
+ "formcraft-ai",
  "formcraft-engine",
  "formcraft-kernel",
  "formcraft-occt",

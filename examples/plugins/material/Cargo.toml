@@ -1,0 +1,22 @@
+[package]
+name = "formcraft-material"
+version = "1.0.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "FormCraft example plugin: mass by material table (command add-in)"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.63"
+serde_json = "1"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+
+# Not part of the FormCraft workspace (built for wasm32-wasip2).
+[workspace]

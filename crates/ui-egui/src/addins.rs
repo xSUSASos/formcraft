@@ -150,6 +150,7 @@ impl AddIns {
             .id(egui::Id::new("addins"))
             .frame(crate::theme::card(t))
             .default_width(SIZE.assistant_w * 1.6)
+            .default_pos(ui.ctx().content_rect().center() - egui::vec2(SIZE.assistant_w * 0.8, SIZE.assistant_w * 0.6))
             .collapsible(false)
             .open(&mut open)
             .show(ui.ctx(), |ui| {

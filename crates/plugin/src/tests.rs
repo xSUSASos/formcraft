@@ -152,3 +152,52 @@ fn misbehaving_plugins_are_unloaded_not_fatal() {
     assert_eq!(d[0]["loaded"], false);
     assert!(d[0]["failure"].as_str().unwrap_or("").contains("timed out"));
 }
+
+/// PLAN Phase 6 acceptance: the assistant sees the add-in's feature in its prompt and a plan
+/// that calls it ("шестерня z=20 m=2") builds the gear.
+#[test]
+fn assistant_uses_the_gear_addin() {
+    use formcraft_ai::{AiRequest, Generator, Mock};
+    let (mut s, plugins) = setup();
+    plugins.load(&gear_dir(), &mut s).unwrap();
+    let sys = formcraft_ai::prompt::system_prompt_for(s.registry(), false);
+    assert!(sys.contains("gear.spur — Involute spur gear"), "the add-in is in the prompt");
+    let reply = r#"{"summary": "Spur gear z=20 m=2", "parameters": [{"name": "teeth", "expression": 20}, {"name": "gear_module", "expression": 2}],
+        "steps": [{"command": "gear.spur", "params": {"teeth": "teeth", "module": "gear_module", "thickness": 10}}]}"#;
+    let mock = std::sync::Arc::new(Mock::replies([reply]));
+    let mut g = Generator::new(mock.clone());
+    g.log = false;
+    let p = g
+        .generate(
+            &s,
+            &AiRequest { prompt: "шестерня z=20 m=2".into(), use_selection: false },
+            &mut |_| {},
+            &std::sync::atomic::AtomicBool::new(false),
+        )
+        .expect("the plan with the add-in command applies");
+    assert_eq!(p.preview.model().bodies.len(), 1);
+    let schema = &mock.requests.lock().unwrap()[0].schema;
+    let ids = schema.as_ref().unwrap()["properties"]["steps"]["items"]["properties"]["command"]["enum"].clone();
+    assert!(ids.as_array().unwrap().contains(&json!("gear.spur")));
+    // accepted into the real session as one group
+    formcraft_ai::plan::apply(&mut s, &p.plan, "AI: gear").unwrap();
+    assert_eq!(s.document().features[0].name, "Spur Gear1");
+    assert!(s.document().features[0].group.is_some());
+}
+
+/// The third example add-in: mass from a material table via host.inspect.
+#[test]
+fn material_addin_computes_mass() {
+    let (mut s, plugins) = setup();
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/plugins/material");
+    plugins.load(&dir, &mut s).expect("material loads");
+    s.execute("solid.box", &json!({"size": [100, 50, 20]})).unwrap();
+    let r = s.execute("material.mass", &json!({"material": "aluminium"})).unwrap();
+    // 100 000 mm³ = 100 cm³ × 2.70 g/cm³ = 270 g
+    assert!((r["total_g"].as_f64().unwrap() - 270.0).abs() < 1e-6, "{r}");
+    let r = s.execute("material.mass", &json!({"material": "steel", "density": 1.0})).unwrap();
+    assert!((r["total_g"].as_f64().unwrap() - 100.0).abs() < 1e-6, "{r}");
+    assert!(s.execute("material.mass", &json!({"material": "unobtainium"})).is_err());
+    assert!(s.execute("material.mass", &json!({"material": "pla", "density": -1})).is_err());
+    assert!(s.registry().get("material.mass").unwrap().spec.ai);
+}

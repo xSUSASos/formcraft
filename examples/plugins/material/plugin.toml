@@ -1,0 +1,12 @@
+id = "material"
+name = "Масса по таблице материалов"
+version = "1.0.0"
+author = "FormCraft examples"
+license = "MIT OR Apache-2.0"
+description = "Command material.mass: mass of the visible bodies from a material density table."
+api = "1.0"
+wasm = "material.wasm"
+
+[permissions]
+files = []
+network = false
