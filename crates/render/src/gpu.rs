@@ -11,6 +11,7 @@ use crate::scene::{LineVertex, MeshVertex, Scene};
 
 pub const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+const DISPLAY_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 const SAMPLES: u32 = 4;
 
 const SHADER: &str = r#"
@@ -104,6 +105,9 @@ struct Targets {
     depth: wgpu::TextureView,
     resolve: wgpu::Texture,
     resolve_view: wgpu::TextureView,
+    /// The same pixels viewed as plain UNorm: egui composites in gamma space, so it must get
+    /// the sRGB-encoded bytes, not values decoded to linear by the sampler.
+    display_view: wgpu::TextureView,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -335,7 +339,7 @@ impl Renderer {
             return;
         }
         let extent = wgpu::Extent3d { width: size[0], height: size[1], depth_or_array_layers: 1 };
-        let make = |label, format, samples, usage| {
+        let make = |label, format, samples, usage, view_formats: &[wgpu::TextureFormat]| {
             self.device.create_texture(&wgpu::TextureDescriptor {
                 label: Some(label),
                 size: extent,
@@ -344,11 +348,11 @@ impl Renderer {
                 dimension: wgpu::TextureDimension::D2,
                 format,
                 usage,
-                view_formats: &[],
+                view_formats,
             })
         };
-        let msaa = make("msaa", COLOR_FORMAT, SAMPLES, wgpu::TextureUsages::RENDER_ATTACHMENT);
-        let depth = make("depth", DEPTH_FORMAT, SAMPLES, wgpu::TextureUsages::RENDER_ATTACHMENT);
+        let msaa = make("msaa", COLOR_FORMAT, SAMPLES, wgpu::TextureUsages::RENDER_ATTACHMENT, &[]);
+        let depth = make("depth", DEPTH_FORMAT, SAMPLES, wgpu::TextureUsages::RENDER_ATTACHMENT, &[]);
         let resolve = make(
             "resolve",
             COLOR_FORMAT,
@@ -356,12 +360,15 @@ impl Renderer {
             wgpu::TextureUsages::RENDER_ATTACHMENT
                 | wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::COPY_SRC,
+            &[DISPLAY_FORMAT],
         );
         self.targets = Some(Targets {
             size,
             msaa: msaa.create_view(&Default::default()),
             depth: depth.create_view(&Default::default()),
             resolve_view: resolve.create_view(&Default::default()),
+            display_view: resolve
+                .create_view(&wgpu::TextureViewDescriptor { format: Some(DISPLAY_FORMAT), ..Default::default() }),
             resolve,
         });
     }
@@ -436,7 +443,7 @@ impl Renderer {
             }
         }
         self.queue.submit(Some(enc.finish()));
-        Some(&t.resolve_view)
+        Some(&t.display_view)
     }
 
     /// Render and read the image back as RGBA8 (row-major, top row first).
