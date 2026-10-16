@@ -607,10 +607,13 @@ impl FormCraftApp {
     fn sketch_palette(&mut self, ui: &mut Ui, t: &Tokens) {
         let Some(mut m) = self.sketch_mode.take() else { return };
         let mut req = Request::None;
+        let top = self.canvas_rect.top() + SIZE.viewcube + SIZE.card_margin * 6.0;
+        let right = self.canvas_rect.right() - SIZE.card_margin;
         egui::Window::new("Sketch Palette")
             .id(Id::new("sketch_palette"))
             .title_bar(false)
-            .anchor(Align2::RIGHT_TOP, Vec2::new(-12.0, 300.0))
+            .frame(crate::theme::card(t))
+            .default_pos(pos2(right - SIZE.palette_w, top))
             .resizable(false)
             .show(ui.ctx(), |ui| req = m.palette(ui, &self.session, t));
         self.sketch_mode = Some(m);
@@ -620,6 +623,13 @@ impl FormCraftApp {
     fn handle_sketch_request(&mut self, req: Request) {
         match req {
             Request::None => {}
+            Request::LookAt => {
+                let id = self.sketch_mode.as_ref().map(|m| m.sketch);
+                if let Some(r) = id.and_then(|id| self.session.model().sketch(id)) {
+                    self.camera.look_from(r.plane.normal);
+                    self.status = "Look At: sketch plane".into();
+                }
+            }
             Request::Finish => self.finish_sketch(),
             Request::Edit(ops) => {
                 let Some(id) = self.sketch_mode.as_ref().map(|m| m.sketch) else { return };

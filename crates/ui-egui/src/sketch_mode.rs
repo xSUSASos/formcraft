@@ -11,7 +11,7 @@ use formcraft_render::camera::Camera;
 use formcraft_sketch::{DimKind, Eid, Entity, Sketch};
 use serde_json::{Value, json};
 
-use crate::theme::Tokens;
+use crate::theme::{SIZE, Tokens};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tool {
@@ -72,6 +72,12 @@ pub struct SketchMode {
     /// First point of the current line chain (clicking it again closes the chain).
     chain_origin: Option<Eid>,
     pub message: Option<String>,
+    /// Triangles of the closed profiles (world space) for the document revision they belong to.
+    fill: Option<(u64, Vec<[glam::DVec3; 3]>)>,
+    /// Palette options (§5.13).
+    pub show_dimensions: bool,
+    pub show_constraints: bool,
+    pub snap: bool,
 }
 
 /// What the app should do after a frame of sketch mode.
@@ -80,6 +86,8 @@ pub enum Request {
     /// Run `sketch.edit` with these ops.
     Edit(Vec<Value>),
     Finish,
+    /// Turn the camera to look at the sketch plane.
+    LookAt,
 }
 
 const SNAP_PX: f32 = 9.0;
@@ -97,7 +105,60 @@ impl SketchMode {
             drag: None,
             chain_origin: None,
             message: None,
+            fill: None,
+            show_dimensions: true,
+            show_constraints: true,
+            snap: true,
         }
+    }
+
+    /// Fill closed profiles (§2.4: `sketch_profile`), triangulated by the kernel once per
+    /// document revision.
+    fn paint_profiles(&mut self, painter: &egui::Painter, s: &Session, cam: &Camera, rect: Rect, t: &Tokens) {
+        let rev = s.revision();
+        if self.fill.as_ref().map(|f| f.0) != Some(rev) {
+            let mut tris = Vec::new();
+            if let Some(r) = s.model().sketch(self.sketch) {
+                let k = s.kernel();
+                for g in &r.regions {
+                    let profile = formcraft_kernel::Profile {
+                        plane: r.plane,
+                        regions: vec![formcraft_kernel::Region { outer: g.outer.clone(), holes: g.holes.clone() }],
+                    };
+                    let Ok(face) = k.make_face(&profile) else { continue };
+                    let Ok(m) = k.tessellate(&face, 0.05) else { continue };
+                    let v = |i: u32| {
+                        m.positions
+                            .get(i as usize)
+                            .map(|p| glam::DVec3::new(f64::from(p[0]), f64::from(p[1]), f64::from(p[2])))
+                    };
+                    for &[i0, i1, i2] in m.indices.as_chunks::<3>().0 {
+                        if let (Some(a), Some(b), Some(d)) = (v(i0), v(i1), v(i2)) {
+                            tris.push([a, b, d]);
+                        }
+                    }
+                }
+            }
+            self.fill = Some((rev, tris));
+        }
+        let Some((_, tris)) = &self.fill else { return };
+        let size = glam::DVec2::new(rect.width() as f64, rect.height() as f64);
+        let mut mesh = egui::Mesh::default();
+        for tri in tris {
+            let pts: Vec<Pos2> = tri
+                .iter()
+                .filter_map(|p| cam.project(*p, size))
+                .map(|q| rect.min + Vec2::new(q.x as f32, q.y as f32))
+                .collect();
+            if let [a, b, c] = pts.as_slice() {
+                let base = mesh.vertices.len() as u32;
+                for q in [a, b, c] {
+                    mesh.colored_vertex(*q, t.sketch_profile);
+                }
+                mesh.add_triangle(base, base + 1, base + 2);
+            }
+        }
+        painter.add(egui::Shape::mesh(mesh));
     }
 
     /// Replace the text of the open dimension field (tests).
@@ -242,6 +303,7 @@ impl SketchMode {
         };
         let (plane, sk) = (r.plane, &r.sketch);
         let painter = ui.painter_at(rect);
+        self.paint_profiles(&painter, s, cam, rect, t);
         let pos = resp.hover_pos();
         let local = pos.and_then(|p| Self::to_plane(&plane, cam, rect, p));
         self.hover = pos.and_then(|p| Self::hit(sk, &plane, cam, rect, p));
@@ -260,7 +322,9 @@ impl SketchMode {
             self.pending.clear();
         }
         if let (true, Some(p)) = (clicked, local) {
-            let at = Self::at(sk, self.hover, p);
+            // Snap off: never reuse an existing point under the cursor.
+            let hit = if self.snap { self.hover } else { None };
+            let at = Self::at(sk, hit, p);
             match self.tool {
                 Tool::Select => {
                     let multi = ui.input(|i| i.modifiers.ctrl || i.modifiers.shift);
@@ -511,7 +575,7 @@ impl SketchMode {
             }
         }
         // Dimension labels at their entities.
-        for d in &sk.dimensions {
+        for d in sk.dimensions.iter().filter(|_| self.show_dimensions) {
             let anchor = match d.kind {
                 DimKind::Length { line } | DimKind::PointLine { line, .. } => match sk.get(line) {
                     Some(Entity::Line { a, b, .. }) => pt(*a).zip(pt(*b)).map(|(a, b)| (a + b) / 2.0),
@@ -603,34 +667,70 @@ impl SketchMode {
             Some(r) => (Some(r.dof), Some(r.sketch.clone())),
             None => (None, None),
         };
-        ui.label(RichText::new("SKETCH PALETTE").size(11.0).strong().color(t.text_secondary));
-        ui.separator();
-        egui::Grid::new("sketch_tools").num_columns(2).show(ui, |ui| {
-            for (i, tool) in [Tool::Select, Tool::Line, Tool::Rectangle, Tool::Circle, Tool::Arc, Tool::Dimension]
-                .into_iter()
-                .enumerate()
-            {
-                if ui.selectable_label(self.tool == tool, tool.label()).clicked() {
+        let g = SIZE.grid;
+        ui.set_width(SIZE.palette_w - g * 4.0);
+        let section = |ui: &mut Ui, title: &str| {
+            ui.add_space(g);
+            ui.label(
+                RichText::new(title.to_uppercase())
+                    .size(SIZE.font_group)
+                    .extra_letter_spacing(SIZE.group_letter_spacing)
+                    .color(t.group_label),
+            );
+        };
+        section(ui, "Sketch palette");
+        let r = ui.cursor();
+        ui.painter().hline(r.x_range(), r.top(), egui::Stroke::new(1.0, t.divider));
+        section(ui, "Options");
+        if ui.button("Look At").on_hover_text("Look straight at the sketch plane").clicked() {
+            req = Request::LookAt;
+        }
+        ui.checkbox(&mut self.snap, "Snap");
+        ui.add_enabled(false, egui::Checkbox::new(&mut self.show_constraints, "Show Constraints"))
+            .on_disabled_hover_text("Constraint badges are not drawn yet");
+        ui.checkbox(&mut self.show_dimensions, "Show Dimensions");
+        ui.add_enabled(false, egui::Checkbox::new(&mut false, "Slice")).on_disabled_hover_text("Not available yet");
+        section(ui, "Tools");
+        let cell = (SIZE.palette_w - g * 4.0) / 6.0;
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 0.0;
+            for tool in [Tool::Select, Tool::Line, Tool::Rectangle, Tool::Circle, Tool::Arc, Tool::Dimension] {
+                let icon = match tool {
+                    Tool::Select => "orbit",
+                    Tool::Line => "line",
+                    Tool::Rectangle => "rectangle",
+                    Tool::Circle => "circle",
+                    Tool::Arc => "arc",
+                    Tool::Dimension => "dimension",
+                };
+                let on = self.tool == tool;
+                if crate::icons::button(ui, t, icon, tool.label(), cell, true, on).clicked() {
                     self.set_tool(tool);
-                }
-                if i % 2 == 1 {
-                    ui.end_row();
                 }
             }
         });
-        ui.separator();
-        ui.label(RichText::new("Constraints").strong());
+        section(ui, "Constraints");
         let sel = self.selected.clone();
         let kind_of = |id: Eid| sk.as_ref().and_then(|s| s.get(id).cloned());
         let is_line = |id: Eid| matches!(kind_of(id), Some(Entity::Line { .. }));
         let is_point = |id: Eid| matches!(kind_of(id), Some(Entity::Point { .. }));
         let is_round = |id: Eid| matches!(kind_of(id), Some(Entity::Circle { .. } | Entity::Arc { .. }));
-        let mut c = |label: &str, ok: bool, constraint: Option<Value>| {
-            if ui.add_enabled(ok, egui::Button::new(label)).clicked()
-                && let Some(c) = constraint
-            {
-                req = Request::Edit(vec![json!({"op": "constraint", "constraint": c})]);
-            }
+        let mut cells: Vec<(&str, &str, bool, Option<Value>)> = Vec::new();
+        let mut c = |label: &'static str, ok: bool, constraint: Option<Value>| {
+            let icon = match label {
+                "Coincident" => "c_coincident",
+                "Point on curve" => "c_point_on_curve",
+                "Horizontal" => "c_horizontal",
+                "Vertical" => "c_vertical",
+                "Parallel" => "c_parallel",
+                "Perpendicular" => "c_perpendicular",
+                "Tangent" => "c_tangent",
+                "Equal" => "c_equal",
+                "Concentric" => "c_concentric",
+                "Midpoint" => "c_midpoint",
+                _ => "c_fix",
+            };
+            cells.push((label, icon, ok, constraint));
         };
         let two = |f: &dyn Fn(Eid) -> bool, g: &dyn Fn(Eid) -> bool| matches!(sel.as_slice(), [a, b] if f(*a) && g(*b));
         let pair = |ty: &str| sel.first().zip(sel.get(1)).map(|(a, b)| json!({"type": ty, "a": a.0, "b": b.0}));
@@ -669,7 +769,20 @@ impl SketchMode {
             matches!(sel.as_slice(), [a] if is_point(*a)),
             sel.first().map(|a| json!({"type": "fix", "point": a.0})),
         );
-        ui.separator();
+        for row in cells.chunks(6) {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 0.0;
+                for (label, icon, ok, constraint) in row {
+                    let tip = if *ok { label.to_string() } else { format!("{label}: select suitable geometry first") };
+                    if crate::icons::button(ui, t, icon, &tip, cell, *ok, false).clicked()
+                        && let Some(c) = constraint
+                    {
+                        req = Request::Edit(vec![json!({"op": "constraint", "constraint": c})]);
+                    }
+                }
+            });
+        }
+        ui.add_space(g);
         match dof {
             Some(0) => ui.label(RichText::new("Fully constrained").color(t.ok)),
             Some(n) => ui.label(format!("{n} degrees of freedom")),
@@ -678,8 +791,12 @@ impl SketchMode {
         if let Some(m) = &self.message {
             ui.label(RichText::new(m).color(t.warning));
         }
-        ui.add_space(6.0);
-        if ui.add(egui::Button::new(RichText::new("Finish Sketch").color(Color32::WHITE)).fill(t.ok)).clicked() {
+        ui.add_space(g * 2.0);
+        let finish = egui::Button::new(RichText::new("FINISH SKETCH").strong().color(Color32::WHITE))
+            .fill(t.ok)
+            .corner_radius(egui::CornerRadius::same(SIZE.radius_button))
+            .min_size(Vec2::new(SIZE.palette_w - g * 4.0, SIZE.input_h + g));
+        if ui.add(finish).clicked() {
             req = Request::Finish;
         }
         req
