@@ -71,7 +71,7 @@ impl Default for Layout {
             browser_collapsed: false,
             timeline: PanelState::docked(true, SIZE.timeline_h),
             // Text Commands starts collapsed, like Fusion's.
-            text_commands: PanelState::docked(false, 160.0),
+            text_commands: PanelState::docked(false, SIZE.text_commands_h),
             assistant: PanelState::docked(false, 300.0),
             nav_bar: true,
             favorites: [

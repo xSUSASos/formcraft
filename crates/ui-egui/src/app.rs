@@ -119,6 +119,8 @@ pub struct FormCraftApp {
     fonts_installed: bool,
     /// The next "close/new document" click discards unsaved changes.
     discard_armed: bool,
+    /// Regen-error toast: (document revision it belongs to, shown until this time).
+    toast: Option<(u64, f64)>,
 }
 
 /// Marks screenshots requested through the control channel.
@@ -219,6 +221,7 @@ impl FormCraftApp {
             pending_shots: Vec::new(),
             fonts_installed: false,
             discard_armed: false,
+            toast: None,
         };
         if let Some(path) = app.options.script.clone() {
             app.run_script_file(&path);
@@ -1363,20 +1366,33 @@ impl FormCraftApp {
         if !self.layout.text_commands.open {
             // Collapsed: a thin strip that expands on click (like Fusion's).
             Panel::bottom("text_commands_bar")
-                .exact_size(22.0)
-                .frame(egui::Frame::new().fill(t.panel_header).inner_margin(egui::Margin::symmetric(6, 2)))
+                .exact_size(SIZE.text_commands_strip)
+                .frame(
+                    egui::Frame::new()
+                        .fill(t.panel_header)
+                        .inner_margin(egui::Margin::symmetric(SIZE.grid as i8 * 2, 0)),
+                )
                 .show(ui, |ui| {
                     ui.horizontal_centered(|ui| {
-                        if icons::button(ui, t, "expand", "Show Text Commands", 16.0, true, false).clicked() {
-                            self.layout.text_commands.open = true;
-                        }
                         let r = ui.add(
                             egui::Label::new(
-                                egui::RichText::new("TEXT COMMANDS").size(10.5).strong().color(t.text_secondary),
+                                egui::RichText::new("TEXT COMMANDS")
+                                    .size(SIZE.font_group)
+                                    .extra_letter_spacing(SIZE.group_letter_spacing)
+                                    .color(t.group_label),
                             )
                             .sense(Sense::click()),
                         );
-                        if r.clicked() {
+                        // ▴ (drawn: the UI font has no such glyph)
+                        let (tri, tr) = ui.allocate_exact_size(Vec2::splat(SIZE.font_group), Sense::click());
+                        let c = tri.center();
+                        let h = SIZE.font_group * 0.35;
+                        ui.painter().add(egui::Shape::convex_polygon(
+                            vec![pos2(c.x - h, c.y + h * 0.6), pos2(c.x + h, c.y + h * 0.6), pos2(c.x, c.y - h * 0.6)],
+                            t.group_label,
+                            Stroke::NONE,
+                        ));
+                        if r.on_hover_text("Show Text Commands").clicked() || tr.clicked() {
                             self.layout.text_commands.open = true;
                         }
                     });
@@ -1392,14 +1408,19 @@ impl FormCraftApp {
             .frame(egui::Frame::new().fill(t.panel_bg).inner_margin(6))
             .show_collapsible(ui, &mut open, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new("TEXT COMMANDS").size(11.0).strong().color(t.text_secondary));
+                    ui.label(
+                        egui::RichText::new("TEXT COMMANDS")
+                            .size(SIZE.font_group)
+                            .extra_letter_spacing(SIZE.group_letter_spacing)
+                            .color(t.group_label),
+                    );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if icons::button(ui, t, "dropdown", "Collapse", 16.0, true, false).clicked() {
                             self.layout.text_commands.open = false;
                         }
                     });
                 });
-                let input_h = 26.0;
+                let input_h = SIZE.input_h + SIZE.grid;
                 egui::ScrollArea::vertical().max_height(ui.available_height() - input_h).stick_to_bottom(true).show(
                     ui,
                     |ui| {
@@ -1408,7 +1429,7 @@ impl FormCraftApp {
                             ui.label(
                                 egui::RichText::new(format!("{} {} → {}", e.command, e.params, e.message))
                                     .monospace()
-                                    .size(11.5)
+                                    .size(SIZE.font_panel - 1.0)
                                     .color(c),
                             );
                         }
@@ -1663,6 +1684,16 @@ impl FormCraftApp {
         };
         if !dragging {
             self.session.selection_mut().hover = hit;
+            // §5.4: what is under the cursor, after the tooltip delay
+            if let Some(h) = hit {
+                let body = self.session.document().body_name(h.body());
+                let text = match h {
+                    Pick::Face { .. } => format!("Face · {body}"),
+                    Pick::Edge { .. } => format!("Edge · {body}"),
+                    Pick::Body { .. } => body,
+                };
+                resp.clone().on_hover_text_at_pointer(text);
+            }
         }
         if resp.clicked() && self.nav == NavMode::Select {
             let multi = ui.input(|i| i.modifiers.ctrl || i.modifiers.shift);
@@ -1930,7 +1961,59 @@ impl FormCraftApp {
         if self.sketch_mode.is_some() {
             self.sketch_palette(ui, &t);
         }
+        self.error_toast(ui, &t);
         self.handle_screenshot(ui);
+    }
+
+    /// §6: when a rebuild ends with feature errors, a toast in the bottom-right corner for 4 s
+    /// with "Show" (opens the first failing feature).
+    fn error_toast(&mut self, ui: &mut Ui, t: &Tokens) {
+        let failed: Vec<(FeatureId, String, String)> = self
+            .session
+            .model()
+            .status
+            .iter()
+            .filter_map(|f| match &f.status {
+                formcraft_engine::regen::Status::Error(e) => Some((f.id, f.name.clone(), e.clone())),
+                _ => None,
+            })
+            .collect();
+        let now = ui.input(|i| i.time);
+        let rev = self.session.revision();
+        if failed.is_empty() {
+            self.toast = None;
+            return;
+        }
+        if self.toast.is_none_or(|(r, _)| r != rev) {
+            self.toast = Some((rev, now + 4.0));
+        }
+        let Some((_, until)) = self.toast else { return };
+        if now > until {
+            return;
+        }
+        ui.ctx().request_repaint_after(std::time::Duration::from_millis(250));
+        let Some((id, name, err)) = failed.first().cloned() else { return };
+        let pos = self.canvas_rect.right_bottom() - Vec2::new(SIZE.card_margin, SIZE.card_margin);
+        egui::Area::new(Id::new("error_toast"))
+            .order(egui::Order::Foreground)
+            .pivot(Align2::RIGHT_BOTTOM)
+            .fixed_pos(pos)
+            .show(ui.ctx(), |ui| {
+                crate::theme::card(t).stroke(Stroke::new(1.0, t.error)).show(ui, |ui| {
+                    ui.set_max_width(SIZE.assistant_w);
+                    ui.horizontal(|ui| {
+                        ui.label(egui::RichText::new(format!("{name} failed")).strong().color(t.error));
+                        let more =
+                            if failed.len() > 1 { format!(" (+{} more)", failed.len() - 1) } else { String::new() };
+                        ui.label(egui::RichText::new(more).color(t.text_secondary));
+                        if ui.button("Show").clicked() {
+                            self.toast = None;
+                            self.edit_feature(id);
+                        }
+                    });
+                    ui.label(egui::RichText::new(err).size(SIZE.font_group + 1.0).color(t.text_secondary));
+                });
+            });
     }
 }
 

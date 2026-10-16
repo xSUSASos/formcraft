@@ -227,6 +227,7 @@ impl Tokens {
         style.spacing.item_spacing = egui::vec2(s.grid * 2.0, s.grid);
         style.spacing.button_padding = egui::vec2(s.grid * 1.5, s.grid * 0.75);
         style.spacing.interact_size.y = s.input_h;
+        style.interaction.tooltip_delay = s.tooltip_delay;
     }
 }
 
