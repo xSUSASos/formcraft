@@ -29,6 +29,8 @@ usage:
   formcraft-cli mcp [--port N]     MCP server on stdio (headless, or attached to `formcraft --control N`)
   formcraft-cli screenshot <scene|all> <out.png|dir> [--theme light|dark|both] [--size WxH]
                                    offscreen UI screenshots (UI_SPEC.md §8 scenes; default 1920x1080, both themes)
+  formcraft-cli ai-bench [--limit N] [--level simple|medium] [--out report.json]
+                                   score the configured LLM on crates/ai/bench/cases.json
   formcraft-cli ai \"<request>\" [--save <out.step|out.stl|out.fcraft>] [--plan-only]
                                    build a part with the local LLM (FORMCRAFT_AI_MODEL, FORMCRAFT_AI_URL)
 
@@ -55,6 +57,7 @@ fn main() -> ExitCode {
         Some("render") => render(&args[1..]),
         Some("mcp") => mcp(&args[1..]),
         Some("ai") => ai(&args[1..]),
+        Some("ai-bench") => ai_bench(&args[1..]),
         Some("screenshot") => screenshot(&args[1..]),
         Some("-h" | "--help" | "help") | None => {
             print!("{USAGE}");
@@ -165,6 +168,50 @@ fn screenshot(args: &[String]) -> Result<(), String> {
             img.save(&path).map_err(|e| format!("{}: {e}", path.display()))?;
             eprintln!("{}", path.display());
         }
+    }
+    Ok(())
+}
+
+fn ai_bench(args: &[String]) -> Result<(), String> {
+    use formcraft_ai::bench;
+    let (mut limit, mut level, mut out) = (usize::MAX, None::<String>, None::<String>);
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match a.as_str() {
+            "--limit" => limit = it.next().and_then(|n| n.parse().ok()).ok_or("--limit N")?,
+            "--level" => level = Some(it.next().ok_or("--level simple|medium")?.clone()),
+            "--out" => out = Some(it.next().ok_or("--out path")?.clone()),
+            other => return Err(format!("unexpected argument `{other}`")),
+        }
+    }
+    let cases: Vec<bench::Case> =
+        bench::cases()?.into_iter().filter(|c| level.as_deref().is_none_or(|l| c.level == l)).take(limit).collect();
+    let mut s = Session::new();
+    let config = formcraft_ai::AiConfig::from_env();
+    let g = formcraft_ai::install(&mut s, &config)?;
+    eprintln!("ai-bench: {} cases, {} · {}", cases.len(), config.backend, config.model);
+    let n = cases.len();
+    let report = bench::run(&g, &cases, &mut |i, r| {
+        let mark = |b: bool| if b { "✓" } else { "·" };
+        eprintln!(
+            "[{}/{n}] {:<28} valid {} rebuilt {} matched {}  {:>5.1} s  {}",
+            i + 1,
+            r.id,
+            mark(r.valid),
+            mark(r.rebuilt),
+            mark(r.matched),
+            r.seconds,
+            r.notes.join("; ")
+        );
+    });
+    eprintln!(
+        "valid {}%  rebuilt {}%  matched {}%  (simple: valid {}%)  mean {:.1} s",
+        report.valid_pct, report.rebuilt_pct, report.matched_pct, report.simple_valid_pct, report.mean_seconds
+    );
+    let text = serde_json::to_string_pretty(&bench::to_value(&report)).unwrap_or_default();
+    match out {
+        Some(p) => std::fs::write(&p, text).map_err(|e| format!("{p}: {e}"))?,
+        None => println!("{text}"),
     }
     Ok(())
 }

@@ -22,7 +22,9 @@ Rules:
 - Through holes in a plate: solid.hole with points on the top face ([x, y, top_z]) and a diameter.
 - Holes on a bolt circle: compute every point explicitly (x = r*cos(a), y = r*sin(a)); write numbers or expressions with cos/sin in degrees.
 - Faces and edges are chosen with selectors (see below), never by index.
-- Keep it simple: the fewest features that give the requested shape.";
+- Keep it simple: the fewest features that give the requested shape. Never add features that were not asked for (no fillets, chamfers or extra holes unless the request mentions them).
+- A disc or flange is a circle sketch extruded (or solid.cylinder); a plate is a rectangle sketch extruded (or solid.box).
+- If a step fails, change only what the error is about and keep the rest of the plan.";
 
 /// Compact one-line-per-property rendering of a JSON schema (small models read this better
 /// than raw JSON schema and it is ~3x shorter).

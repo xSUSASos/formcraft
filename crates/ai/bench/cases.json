@@ -1,0 +1,705 @@
+[
+  {
+    "id": "block_50_30_20",
+    "prompt": "box 50 x 30 x 20 mm",
+    "level": "simple",
+    "expect": {"size": [50, 30, 20], "volume": 30000, "cylindrical_faces": 0},
+    "reference": {
+      "summary": "block 50 30 20",
+      "parameters": [{"name": "block_l", "expression": 50}, {"name": "block_w", "expression": 30}, {"name": "block_h", "expression": 20}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["block_l", "block_w", "block_h"]}}
+      ]
+    }
+  },
+  {
+    "id": "plate_100_60_8",
+    "prompt": "прямоугольная пластина 100 на 60 мм, толщина 8 мм",
+    "level": "simple",
+    "expect": {"size": [100, 60, 8], "volume": 48000, "cylindrical_faces": 0},
+    "reference": {
+      "summary": "plate 100 60 8",
+      "parameters": [{"name": "plate_l", "expression": 100}, {"name": "plate_w", "expression": 60}, {"name": "plate_t", "expression": 8}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["plate_l", "plate_w", "plate_t"]}}
+      ]
+    }
+  },
+  {
+    "id": "cube_25",
+    "prompt": "a solid cube with 25 mm sides",
+    "level": "simple",
+    "expect": {"size": [25, 25, 25], "volume": 15625, "cylindrical_faces": 0},
+    "reference": {
+      "summary": "cube 25",
+      "parameters": [{"name": "side", "expression": 25}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["side", "side", "side"]}}
+      ]
+    }
+  },
+  {
+    "id": "disc_d80_t6",
+    "prompt": "round disc, diameter 80 mm, 6 mm thick",
+    "level": "simple",
+    "expect": {"size": [80, 80, 6], "volume": 30159.29, "cylindrical_faces": 1},
+    "reference": {
+      "summary": "disc d80 t6",
+      "parameters": [{"name": "disc_d", "expression": 80}, {"name": "disc_t", "expression": 6}],
+      "steps": [
+        {"command": "solid.cylinder", "params": {"diameter": "disc_d", "height": "disc_t"}}
+      ]
+    }
+  },
+  {
+    "id": "disc_d45_h15",
+    "prompt": "цилиндр диаметром 45 и высотой 15",
+    "level": "simple",
+    "expect": {"size": [45, 45, 15], "volume": 23856.47, "cylindrical_faces": 1},
+    "reference": {
+      "summary": "disc d45 h15",
+      "parameters": [{"name": "cyl_d", "expression": 45}, {"name": "cyl_h", "expression": 15}],
+      "steps": [
+        {"command": "solid.cylinder", "params": {"diameter": "cyl_d", "height": "cyl_h"}}
+      ]
+    }
+  },
+  {
+    "id": "plate_centre_hole",
+    "prompt": "square plate 70 x 70 mm, 6 mm thick, with one 12 mm through hole in the exact centre",
+    "level": "simple",
+    "expect": {"size": [70, 70, 6], "volume": 28721.42, "cylindrical_faces": 1},
+    "reference": {
+      "summary": "plate centre hole",
+      "parameters": [{"name": "plate_a", "expression": 70}, {"name": "plate_t", "expression": 6}, {"name": "hole_d", "expression": 12}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["plate_a", "plate_a", "plate_t"]}},
+        {"command": "solid.hole", "params": {"diameter": "hole_d", "points": [["plate_a / 2", "plate_a / 2", "plate_t"]]}}
+      ]
+    }
+  },
+  {
+    "id": "plate_corner_holes",
+    "prompt": "пластина 90 x 60, толщина 5, четыре отверстия Ø5 по углам, центры в 10 мм от краёв",
+    "level": "simple",
+    "expect": {"size": [90, 60, 5], "volume": 26607.3, "cylindrical_faces": 4},
+    "reference": {
+      "summary": "plate corner holes",
+      "parameters": [{"name": "plate_l", "expression": 90}, {"name": "plate_w", "expression": 60}, {"name": "plate_t", "expression": 5}, {"name": "hole_d", "expression": 5}, {"name": "margin", "expression": 10}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["plate_l", "plate_w", "plate_t"]}},
+        {"command": "solid.hole", "params": {"diameter": "hole_d", "points": [["margin", "margin", "plate_t"], ["plate_l - margin", "margin", "plate_t"], ["plate_l - margin", "plate_w - margin", "plate_t"], ["margin", "plate_w - margin", "plate_t"]]}}
+      ]
+    }
+  },
+  {
+    "id": "plate_three_holes_row",
+    "prompt": "flat plate 120 x 30 mm, 6 mm thick, three 8 mm holes in a row on the centre line of the long side at 20, 60 and 100 mm from the left end",
+    "level": "simple",
+    "expect": {"size": [120, 30, 6], "volume": 20695.22, "cylindrical_faces": 3},
+    "reference": {
+      "summary": "plate three holes row",
+      "parameters": [{"name": "plate_l", "expression": 120}, {"name": "plate_w", "expression": 30}, {"name": "plate_t", "expression": 6}, {"name": "hole_d", "expression": 8}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["plate_l", "plate_w", "plate_t"]}},
+        {"command": "solid.hole", "params": {"diameter": "hole_d", "points": [[20, "plate_w / 2", "plate_t"], [60, "plate_w / 2", "plate_t"], [100, "plate_w / 2", "plate_t"]]}}
+      ]
+    }
+  },
+  {
+    "id": "plate_six_holes_grid",
+    "prompt": "пластина 100 x 50 x 4 мм с шестью отверстиями Ø5: три в ряд на расстояниях 20, 50 и 80 мм от левого края, ряды на 15 и 35 мм от нижнего края",
+    "level": "simple",
+    "expect": {"size": [100, 50, 4], "volume": 19528.76, "cylindrical_faces": 6},
+    "reference": {
+      "summary": "plate six holes grid",
+      "parameters": [{"name": "plate_l", "expression": 100}, {"name": "plate_w", "expression": 50}, {"name": "plate_t", "expression": 4}, {"name": "hole_d", "expression": 5}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["plate_l", "plate_w", "plate_t"]}},
+        {"command": "solid.hole", "params": {"diameter": "hole_d", "points": [[20, 15, "plate_t"], [50, 15, "plate_t"], [80, 15, "plate_t"], [20, 35, "plate_t"], [50, 35, "plate_t"], [80, 35, "plate_t"]]}}
+      ]
+    }
+  },
+  {
+    "id": "washer_m8",
+    "prompt": "flat washer: outer diameter 16, hole diameter 8.4, thickness 1.6",
+    "level": "simple",
+    "expect": {"size": [16, 16, 1.6], "volume": 233.03, "cylindrical_faces": 2},
+    "reference": {
+      "summary": "washer m8",
+      "parameters": [{"name": "outer_d", "expression": 16}, {"name": "inner_d", "expression": 8.4}, {"name": "washer_t", "expression": 1.6}],
+      "steps": [
+        {"command": "sketch.create", "params": {"plane": "XY", "circles": [{"center": [0, 0], "diameter": "outer_d"}, {"center": [0, 0], "diameter": "inner_d"}]}},
+        {"command": "solid.extrude", "params": {"distance": "washer_t"}}
+      ]
+    }
+  },
+  {
+    "id": "washer_d30",
+    "prompt": "шайба: наружный диаметр 30, внутренний 13, толщина 3",
+    "level": "simple",
+    "expect": {"size": [30, 30, 3], "volume": 1722.38, "cylindrical_faces": 2},
+    "reference": {
+      "summary": "washer d30",
+      "parameters": [{"name": "outer_d", "expression": 30}, {"name": "inner_d", "expression": 13}, {"name": "washer_t", "expression": 3}],
+      "steps": [
+        {"command": "sketch.create", "params": {"plane": "XY", "circles": [{"center": [0, 0], "diameter": "outer_d"}, {"center": [0, 0], "diameter": "inner_d"}]}},
+        {"command": "solid.extrude", "params": {"distance": "washer_t"}}
+      ]
+    }
+  },
+  {
+    "id": "spacer_tube_12_6",
+    "prompt": "round spacer: outside diameter 12, bore 6, length 20",
+    "level": "simple",
+    "expect": {"size": [12, 12, 20], "volume": 1696.46, "cylindrical_faces": 2},
+    "reference": {
+      "summary": "spacer tube 12 6",
+      "parameters": [{"name": "outer_d", "expression": 12}, {"name": "bore_d", "expression": 6}, {"name": "spacer_len", "expression": 20}],
+      "steps": [
+        {"command": "sketch.create", "params": {"plane": "XY", "circles": [{"center": [0, 0], "diameter": "outer_d"}, {"center": [0, 0], "diameter": "bore_d"}]}},
+        {"command": "solid.extrude", "params": {"distance": "spacer_len"}}
+      ]
+    }
+  },
+  {
+    "id": "pipe_50_44",
+    "prompt": "труба: наружный диаметр 50, внутренний 44, длина 200",
+    "level": "simple",
+    "expect": {"size": [50, 50, 200], "volume": 88592.91, "cylindrical_faces": 2},
+    "reference": {
+      "summary": "pipe 50 44",
+      "parameters": [{"name": "outer_d", "expression": 50}, {"name": "inner_d", "expression": 44}, {"name": "pipe_len", "expression": 200}],
+      "steps": [
+        {"command": "sketch.create", "params": {"plane": "XY", "circles": [{"center": [0, 0], "diameter": "outer_d"}, {"center": [0, 0], "diameter": "inner_d"}]}},
+        {"command": "solid.extrude", "params": {"distance": "pipe_len"}}
+      ]
+    }
+  },
+  {
+    "id": "square_tube_30",
+    "prompt": "square tube, outside 30 x 30 mm, wall 2 mm, length 100 mm",
+    "level": "simple",
+    "expect": {"size": [30, 30, 100], "volume": 22400, "cylindrical_faces": 0},
+    "reference": {
+      "summary": "square tube 30",
+      "parameters": [{"name": "tube_a", "expression": 30}, {"name": "wall", "expression": 2}, {"name": "tube_len", "expression": 100}],
+      "steps": [
+        {"command": "sketch.create", "params": {"plane": "XY", "rectangles": [{"corner": [0, 0], "size": ["tube_a", "tube_a"]}, {"corner": ["wall", "wall"], "size": ["tube_a - 2 * wall", "tube_a - 2 * wall"]}]}},
+        {"command": "solid.extrude", "params": {"distance": "tube_len"}}
+      ]
+    }
+  },
+  {
+    "id": "l_profile_40_30",
+    "prompt": "L-profile (angle) with legs 40 mm and 30 mm, wall thickness 5 mm, length 80 mm; the 40 mm leg lies along X, the 30 mm leg along Y",
+    "level": "simple",
+    "expect": {"size": [40, 30, 80], "volume": 26000, "cylindrical_faces": 0},
+    "reference": {
+      "summary": "l profile 40 30",
+      "parameters": [{"name": "leg_a", "expression": 40}, {"name": "leg_b", "expression": 30}, {"name": "t", "expression": 5}, {"name": "prof_len", "expression": 80}],
+      "steps": [
+        {"command": "sketch.create", "params": {"plane": "XY", "polylines": [{"points": [[0, 0], ["leg_a", 0], ["leg_a", "t"], ["t", "t"], ["t", "leg_b"], [0, "leg_b"]]}]}},
+        {"command": "solid.extrude", "params": {"distance": "prof_len"}}
+      ]
+    }
+  },
+  {
+    "id": "t_profile_60_40",
+    "prompt": "Т-профиль: полка шириной 60 и толщиной 6, стенка толщиной 6, общая высота 40, длина 100; полка внизу, стенка по центру полки",
+    "level": "simple",
+    "expect": {"size": [60, 40, 100], "volume": 56400, "cylindrical_faces": 0},
+    "reference": {
+      "summary": "t profile 60 40",
+      "parameters": [{"name": "flange_w", "expression": 60}, {"name": "flange_t", "expression": 6}, {"name": "web_t", "expression": 6}, {"name": "total_h", "expression": 40}, {"name": "prof_len", "expression": 100}],
+      "steps": [
+        {"command": "sketch.create", "params": {"plane": "XY", "polylines": [{"points": [[0, 0], ["flange_w", 0], ["flange_w", "flange_t"], ["(flange_w + web_t) / 2", "flange_t"], ["(flange_w + web_t) / 2", "total_h"], ["(flange_w - web_t) / 2", "total_h"], ["(flange_w - web_t) / 2", "flange_t"], [0, "flange_t"]]}]}},
+        {"command": "solid.extrude", "params": {"distance": "prof_len"}}
+      ]
+    }
+  },
+  {
+    "id": "u_profile_50_25",
+    "prompt": "U-channel: width 50, height 25, wall thickness 4 (bottom and both sides), length 60",
+    "level": "simple",
+    "expect": {"size": [50, 25, 60], "volume": 22080, "cylindrical_faces": 0},
+    "reference": {
+      "summary": "u profile 50 25",
+      "parameters": [{"name": "ch_w", "expression": 50}, {"name": "ch_h", "expression": 25}, {"name": "wall", "expression": 4}, {"name": "ch_len", "expression": 60}],
+      "steps": [
+        {"command": "sketch.create", "params": {"plane": "XY", "polylines": [{"points": [[0, 0], ["ch_w", 0], ["ch_w", "ch_h"], ["ch_w - wall", "ch_h"], ["ch_w - wall", "wall"], ["wall", "wall"], ["wall", "ch_h"], [0, "ch_h"]]}]}},
+        {"command": "solid.extrude", "params": {"distance": "ch_len"}}
+      ]
+    }
+  },
+  {
+    "id": "cylinder_through_bore",
+    "prompt": "цилиндр Ø60 высотой 40 с центральным сквозным отверстием Ø20",
+    "level": "simple",
+    "expect": {"size": [60, 60, 40], "volume": 100530.96, "cylindrical_faces": 2},
+    "reference": {
+      "summary": "cylinder through bore",
+      "parameters": [{"name": "cyl_d", "expression": 60}, {"name": "cyl_h", "expression": 40}, {"name": "bore_d", "expression": 20}],
+      "steps": [
+        {"command": "solid.cylinder", "params": {"diameter": "cyl_d", "height": "cyl_h"}},
+        {"command": "solid.hole", "params": {"diameter": "bore_d", "points": [[0, 0, "cyl_h"]]}}
+      ]
+    }
+  },
+  {
+    "id": "sleeve_25_15",
+    "prompt": "sleeve: outer diameter 25, inner diameter 15, length 30",
+    "level": "simple",
+    "expect": {"size": [25, 25, 30], "volume": 9424.78, "cylindrical_faces": 2},
+    "reference": {
+      "summary": "sleeve 25 15",
+      "parameters": [{"name": "outer_d", "expression": 25}, {"name": "inner_d", "expression": 15}, {"name": "sleeve_len", "expression": 30}],
+      "steps": [
+        {"command": "sketch.create", "params": {"plane": "XY", "circles": [{"center": [0, 0], "diameter": "outer_d"}, {"center": [0, 0], "diameter": "inner_d"}]}},
+        {"command": "solid.extrude", "params": {"distance": "sleeve_len"}}
+      ]
+    }
+  },
+  {
+    "id": "plate_window",
+    "prompt": "plate 80 x 50 x 5 mm with a rectangular window 40 x 20 mm cut through it, centred on the plate",
+    "level": "simple",
+    "expect": {"size": [80, 50, 5], "volume": 16000, "cylindrical_faces": 0},
+    "reference": {
+      "summary": "plate window",
+      "parameters": [{"name": "plate_l", "expression": 80}, {"name": "plate_w", "expression": 50}, {"name": "plate_t", "expression": 5}, {"name": "win_l", "expression": 40}, {"name": "win_w", "expression": 20}],
+      "steps": [
+        {"command": "sketch.create", "params": {"plane": "XY", "rectangles": [{"corner": [0, 0], "size": ["plate_l", "plate_w"]}, {"corner": ["(plate_l - win_l) / 2", "(plate_w - win_w) / 2"], "size": ["win_l", "win_w"]}]}},
+        {"command": "solid.extrude", "params": {"distance": "plate_t"}}
+      ]
+    }
+  },
+  {
+    "id": "stepped_boss_40_20",
+    "prompt": "цилиндрическая ступенька: нижний цилиндр Ø40 высотой 10, на нём соосно цилиндр Ø20 высотой 15",
+    "level": "simple",
+    "expect": {"size": [40, 40, 25], "volume": 17278.76, "cylindrical_faces": 2},
+    "reference": {
+      "summary": "stepped boss 40 20",
+      "parameters": [{"name": "d1", "expression": 40}, {"name": "h1", "expression": 10}, {"name": "d2", "expression": 20}, {"name": "h2", "expression": 15}],
+      "steps": [
+        {"command": "solid.cylinder", "params": {"diameter": "d1", "height": "h1"}},
+        {"command": "solid.cylinder", "params": {"diameter": "d2", "height": "h2", "operation": "join", "base": [0, 0, "h1"]}}
+      ]
+    }
+  },
+  {
+    "id": "step_block",
+    "prompt": "stepped block: a base block 60 x 40 x 10 mm, and on top of it, flush with the left end (x = 0) and the full 40 mm width, a second block 30 mm long (in X) and 10 mm high",
+    "level": "simple",
+    "expect": {"size": [60, 40, 20], "volume": 36000, "cylindrical_faces": 0},
+    "reference": {
+      "summary": "step block",
+      "parameters": [{"name": "base_l", "expression": 60}, {"name": "base_w", "expression": 40}, {"name": "base_h", "expression": 10}, {"name": "step_l", "expression": 30}, {"name": "step_h", "expression": 10}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["base_l", "base_w", "base_h"]}},
+        {"command": "solid.box", "params": {"size": ["step_l", "base_w", "step_h"], "operation": "join", "corner": [0, 0, "base_h"]}}
+      ]
+    }
+  },
+  {
+    "id": "pin_d6_l40",
+    "prompt": "cylindrical pin, diameter 6 mm, length 40 mm",
+    "level": "simple",
+    "expect": {"size": [6, 6, 40], "volume": 1130.97, "cylindrical_faces": 1},
+    "reference": {
+      "summary": "pin d6 l40",
+      "parameters": [{"name": "pin_d", "expression": 6}, {"name": "pin_len", "expression": 40}],
+      "steps": [
+        {"command": "solid.cylinder", "params": {"diameter": "pin_d", "height": "pin_len"}}
+      ]
+    }
+  },
+  {
+    "id": "plate_offset_hole",
+    "prompt": "пластина 60 x 40, толщина 10, одно отверстие Ø10, центр на 20 мм от левого края и на середине ширины",
+    "level": "simple",
+    "expect": {"size": [60, 40, 10], "volume": 23214.6, "cylindrical_faces": 1},
+    "reference": {
+      "summary": "plate offset hole",
+      "parameters": [{"name": "plate_l", "expression": 60}, {"name": "plate_w", "expression": 40}, {"name": "plate_t", "expression": 10}, {"name": "hole_d", "expression": 10}, {"name": "hole_x", "expression": 20}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["plate_l", "plate_w", "plate_t"]}},
+        {"command": "solid.hole", "params": {"diameter": "hole_d", "points": [["hole_x", "plate_w / 2", "plate_t"]]}}
+      ]
+    }
+  },
+  {
+    "id": "triangle_prism",
+    "prompt": "right triangular prism: the right angle is at the origin, legs of 40 mm along X and 30 mm along Y, extruded 12 mm",
+    "level": "simple",
+    "expect": {"size": [40, 30, 12], "volume": 7200, "cylindrical_faces": 0},
+    "reference": {
+      "summary": "triangle prism",
+      "parameters": [{"name": "leg_x", "expression": 40}, {"name": "leg_y", "expression": 30}, {"name": "prism_h", "expression": 12}],
+      "steps": [
+        {"command": "sketch.create", "params": {"plane": "XY", "polylines": [{"points": [[0, 0], ["leg_x", 0], [0, "leg_y"]]}]}},
+        {"command": "solid.extrude", "params": {"distance": "prism_h"}}
+      ]
+    }
+  },
+  {
+    "id": "cube_through_hole",
+    "prompt": "cube with 40 mm sides and one 10 mm hole drilled through the centre from top to bottom",
+    "level": "simple",
+    "expect": {"size": [40, 40, 40], "volume": 60858.41, "cylindrical_faces": 1},
+    "reference": {
+      "summary": "cube through hole",
+      "parameters": [{"name": "side", "expression": 40}, {"name": "hole_d", "expression": 10}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["side", "side", "side"]}},
+        {"command": "solid.hole", "params": {"diameter": "hole_d", "points": [["side / 2", "side / 2", "side"]]}}
+      ]
+    }
+  },
+  {
+    "id": "flat_bar_two_holes",
+    "prompt": "flat bar 200 x 20 x 4 mm with two 5 mm through holes on the centre line, each 10 mm from its end",
+    "level": "simple",
+    "expect": {"size": [200, 20, 4], "volume": 15842.92, "cylindrical_faces": 2},
+    "reference": {
+      "summary": "flat bar two holes",
+      "parameters": [{"name": "bar_l", "expression": 200}, {"name": "bar_w", "expression": 20}, {"name": "bar_t", "expression": 4}, {"name": "hole_d", "expression": 5}, {"name": "end_off", "expression": 10}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["bar_l", "bar_w", "bar_t"]}},
+        {"command": "solid.hole", "params": {"diameter": "hole_d", "points": [["end_off", "bar_w / 2", "bar_t"], ["bar_l - end_off", "bar_w / 2", "bar_t"]]}}
+      ]
+    }
+  },
+  {
+    "id": "block_blind_hole",
+    "prompt": "block 40 x 40 x 30 mm with a blind hole, diameter 10 and depth 15, drilled from the top face in the centre",
+    "level": "simple",
+    "expect": {"size": [40, 40, 30], "volume": 46821.9, "cylindrical_faces": 1},
+    "reference": {
+      "summary": "block blind hole",
+      "parameters": [{"name": "block_a", "expression": 40}, {"name": "block_h", "expression": 30}, {"name": "hole_d", "expression": 10}, {"name": "hole_depth", "expression": 15}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["block_a", "block_a", "block_h"]}},
+        {"command": "solid.hole", "params": {"diameter": "hole_d", "points": [["block_a / 2", "block_a / 2", "block_h"]], "depth": "hole_depth"}}
+      ]
+    }
+  },
+  {
+    "id": "square_plate_diag_holes",
+    "prompt": "квадратная пластина 50 x 50, толщина 5, два отверстия Ø6 в противоположных углах (левый нижний и правый верхний), центры в 8 мм от краёв",
+    "level": "simple",
+    "expect": {"size": [50, 50, 5], "volume": 12217.26, "cylindrical_faces": 2},
+    "reference": {
+      "summary": "square plate diag holes",
+      "parameters": [{"name": "plate_a", "expression": 50}, {"name": "plate_t", "expression": 5}, {"name": "hole_d", "expression": 6}, {"name": "margin", "expression": 8}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["plate_a", "plate_a", "plate_t"]}},
+        {"command": "solid.hole", "params": {"diameter": "hole_d", "points": [["margin", "margin", "plate_t"], ["plate_a - margin", "plate_a - margin", "plate_t"]]}}
+      ]
+    }
+  },
+  {
+    "id": "brick_80_20_15_two_holes",
+    "prompt": "брусок 80 x 20 x 15 с двумя сквозными отверстиями Ø6 по оси бруска сверху вниз, на расстоянии 20 и 60 мм от левого торца",
+    "level": "simple",
+    "expect": {"size": [80, 20, 15], "volume": 23151.77, "cylindrical_faces": 2},
+    "reference": {
+      "summary": "brick 80 20 15 two holes",
+      "parameters": [{"name": "bar_l", "expression": 80}, {"name": "bar_w", "expression": 20}, {"name": "bar_h", "expression": 15}, {"name": "hole_d", "expression": 6}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["bar_l", "bar_w", "bar_h"]}},
+        {"command": "solid.hole", "params": {"diameter": "hole_d", "points": [[20, "bar_w / 2", "bar_h"], [60, "bar_w / 2", "bar_h"]]}}
+      ]
+    }
+  },
+  {
+    "id": "plate_rounded_corners",
+    "prompt": "plate 80 x 50 mm, 6 mm thick, all four vertical corners rounded with radius 6",
+    "level": "medium",
+    "expect": {"size": [80, 50, 6], "volume": 23814.58, "cylindrical_faces": 4},
+    "reference": {
+      "summary": "plate rounded corners",
+      "parameters": [{"name": "plate_l", "expression": 80}, {"name": "plate_w", "expression": 50}, {"name": "plate_t", "expression": 6}, {"name": "corner_r", "expression": 6}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["plate_l", "plate_w", "plate_t"]}},
+        {"command": "solid.fillet", "params": {"edges": "vertical", "radius": "corner_r"}}
+      ]
+    }
+  },
+  {
+    "id": "plate_rounded_4_holes",
+    "prompt": "пластина 100 x 60, толщина 5, скруглённые углы R8, четыре отверстия Ø5 с центрами в 8 мм от краёв",
+    "level": "medium",
+    "expect": {"size": [100, 60, 5], "volume": 29332.61, "cylindrical_faces": 8},
+    "reference": {
+      "summary": "plate rounded 4 holes",
+      "parameters": [{"name": "plate_l", "expression": 100}, {"name": "plate_w", "expression": 60}, {"name": "plate_t", "expression": 5}, {"name": "corner_r", "expression": 8}, {"name": "hole_d", "expression": 5}, {"name": "margin", "expression": 8}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["plate_l", "plate_w", "plate_t"]}},
+        {"command": "solid.fillet", "params": {"edges": "vertical", "radius": "corner_r"}},
+        {"command": "solid.hole", "params": {"diameter": "hole_d", "points": [["margin", "margin", "plate_t"], ["plate_l - margin", "margin", "plate_t"], ["plate_l - margin", "plate_w - margin", "plate_t"], ["margin", "plate_w - margin", "plate_t"]]}}
+      ]
+    }
+  },
+  {
+    "id": "block_top_chamfer",
+    "prompt": "block 40 x 40 x 20 mm with a 2 mm chamfer around all four edges of the top face",
+    "level": "medium",
+    "expect": {"size": [40, 40, 20], "volume": 31690.67, "cylindrical_faces": 0},
+    "reference": {
+      "summary": "block top chamfer",
+      "parameters": [{"name": "block_a", "expression": 40}, {"name": "block_h", "expression": 20}, {"name": "chamfer", "expression": 2}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["block_a", "block_a", "block_h"]}},
+        {"command": "solid.chamfer", "params": {"edges": "top", "distance": "chamfer"}}
+      ]
+    }
+  },
+  {
+    "id": "counterbore_plate_4",
+    "prompt": "квадратная пластина 60 x 60, толщина 12, четыре отверстия Ø5.5 с цековкой Ø10 глубиной 5 сверху, центры в 10 мм от краёв",
+    "level": "medium",
+    "expect": {"size": [60, 60, 12], "volume": 40963.97, "cylindrical_faces": 8},
+    "reference": {
+      "summary": "counterbore plate 4",
+      "parameters": [{"name": "plate_a", "expression": 60}, {"name": "plate_t", "expression": 12}, {"name": "hole_d", "expression": 5.5}, {"name": "cbore_d", "expression": 10}, {"name": "cbore_depth", "expression": 5}, {"name": "margin", "expression": 10}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["plate_a", "plate_a", "plate_t"]}},
+        {"command": "solid.hole", "params": {"diameter": "hole_d", "points": [["margin", "margin", "plate_t"], ["plate_a - margin", "margin", "plate_t"], ["plate_a - margin", "plate_a - margin", "plate_t"], ["margin", "plate_a - margin", "plate_t"]], "counterbore": {"diameter": "cbore_d", "depth": "cbore_depth"}}}
+      ]
+    }
+  },
+  {
+    "id": "flange_6_holes_bore",
+    "prompt": "round flange: outer diameter 100, thickness 10, central bore 25, six 7 mm holes evenly spaced on a 70 mm bolt circle, the first hole on the +X axis",
+    "level": "medium",
+    "expect": {"size": [100, 100, 10], "volume": 71322.01, "cylindrical_faces": 8},
+    "reference": {
+      "summary": "flange 6 holes bore",
+      "parameters": [{"name": "flange_d", "expression": 100}, {"name": "flange_t", "expression": 10}, {"name": "bore_d", "expression": 25}, {"name": "hole_d", "expression": 7}, {"name": "pcd", "expression": 70}],
+      "steps": [
+        {"command": "solid.cylinder", "params": {"diameter": "flange_d", "height": "flange_t"}},
+        {"command": "solid.hole", "params": {"diameter": "hole_d", "points": [["pcd / 2", 0, "flange_t"], ["pcd / 4", "pcd * 0.4330127", "flange_t"], ["-pcd / 4", "pcd * 0.4330127", "flange_t"], ["-pcd / 2", 0, "flange_t"], ["-pcd / 4", "-pcd * 0.4330127", "flange_t"], ["pcd / 4", "-pcd * 0.4330127", "flange_t"]]}},
+        {"command": "solid.hole", "params": {"diameter": "bore_d", "points": [[0, 0, "flange_t"]]}}
+      ]
+    }
+  },
+  {
+    "id": "flange_8_holes_bore",
+    "prompt": "фланец Ø140, толщина 12, центральное отверстие Ø40, восемь отверстий Ø9 равномерно на окружности Ø110, первое на оси +X",
+    "level": "medium",
+    "expect": {"size": [140, 140, 12], "volume": 163538.75, "cylindrical_faces": 10},
+    "reference": {
+      "summary": "flange 8 holes bore",
+      "parameters": [{"name": "flange_d", "expression": 140}, {"name": "flange_t", "expression": 12}, {"name": "bore_d", "expression": 40}, {"name": "hole_d", "expression": 9}, {"name": "pcd", "expression": 110}],
+      "steps": [
+        {"command": "solid.cylinder", "params": {"diameter": "flange_d", "height": "flange_t"}},
+        {"command": "solid.hole", "params": {"diameter": "hole_d", "points": [["pcd / 2", 0, "flange_t"], ["pcd * 0.3535534", "pcd * 0.3535534", "flange_t"], [0, "pcd / 2", "flange_t"], ["-pcd * 0.3535534", "pcd * 0.3535534", "flange_t"], ["-pcd / 2", 0, "flange_t"], ["-pcd * 0.3535534", "-pcd * 0.3535534", "flange_t"], [0, "-pcd / 2", "flange_t"], ["pcd * 0.3535534", "-pcd * 0.3535534", "flange_t"]]}},
+        {"command": "solid.hole", "params": {"diameter": "bore_d", "points": [[0, 0, "flange_t"]]}}
+      ]
+    }
+  },
+  {
+    "id": "open_box_80_50_30",
+    "prompt": "open-top box 80 x 50 x 30 mm outside, wall and floor thickness 2.5 mm, sharp corners",
+    "level": "medium",
+    "expect": {"size": [80, 50, 30], "volume": 27187.5, "cylindrical_faces": 0},
+    "reference": {
+      "summary": "open box 80 50 30",
+      "parameters": [{"name": "box_l", "expression": 80}, {"name": "box_w", "expression": 50}, {"name": "box_h", "expression": 30}, {"name": "wall", "expression": 2.5}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["box_l", "box_w", "box_h"]}},
+        {"command": "solid.shell", "params": {"faces": "top", "thickness": "wall"}}
+      ]
+    }
+  },
+  {
+    "id": "enclosure_rounded",
+    "prompt": "корпус 90 x 60 x 35 снаружи, открытый сверху, стенки и дно 2 мм, вертикальные рёбра скруглены R5 (скруглять до выемки)",
+    "level": "medium",
+    "expect": {"size": [90, 60, 35], "volume": 29575.84, "cylindrical_faces": 8},
+    "reference": {
+      "summary": "enclosure rounded",
+      "parameters": [{"name": "box_l", "expression": 90}, {"name": "box_w", "expression": 60}, {"name": "box_h", "expression": 35}, {"name": "wall", "expression": 2}, {"name": "corner_r", "expression": 5}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["box_l", "box_w", "box_h"]}},
+        {"command": "solid.fillet", "params": {"edges": "vertical", "radius": "corner_r"}},
+        {"command": "solid.shell", "params": {"faces": "top", "thickness": "wall"}}
+      ]
+    }
+  },
+  {
+    "id": "stepped_shaft_3",
+    "prompt": "stepped shaft along Z built from three coaxial cylinders: D24 x 30 long at the bottom, then D16 x 40, then D10 x 20 on top",
+    "level": "medium",
+    "expect": {"size": [24, 24, 90], "volume": 23184.95, "cylindrical_faces": 3},
+    "reference": {
+      "summary": "stepped shaft 3",
+      "parameters": [{"name": "d1", "expression": 24}, {"name": "l1", "expression": 30}, {"name": "d2", "expression": 16}, {"name": "l2", "expression": 40}, {"name": "d3", "expression": 10}, {"name": "l3", "expression": 20}],
+      "steps": [
+        {"command": "sketch.create", "params": {"plane": "XZ", "polylines": [{"points": [[0, 0], ["d1 / 2", 0], ["d1 / 2", "l1"], ["d2 / 2", "l1"], ["d2 / 2", "l1 + l2"], ["d3 / 2", "l1 + l2"], ["d3 / 2", "l1 + l2 + l3"], [0, "l1 + l2 + l3"]]}]}},
+        {"command": "solid.revolve", "params": {"axis": "Z"}}
+      ]
+    }
+  },
+  {
+    "id": "stepped_shaft_4",
+    "prompt": "ступенчатый вал вдоль оси Z из четырёх соосных цилиндров снизу вверх: Ø40 длиной 20, Ø30 длиной 30, Ø25 длиной 40, Ø20 длиной 15",
+    "level": "medium",
+    "expect": {"size": [40, 40, 105], "volume": 70685.83, "cylindrical_faces": 4},
+    "reference": {
+      "summary": "stepped shaft 4",
+      "parameters": [{"name": "d1", "expression": 40}, {"name": "l1", "expression": 20}, {"name": "d2", "expression": 30}, {"name": "l2", "expression": 30}, {"name": "d3", "expression": 25}, {"name": "l3", "expression": 40}, {"name": "d4", "expression": 20}, {"name": "l4", "expression": 15}],
+      "steps": [
+        {"command": "sketch.create", "params": {"plane": "XZ", "polylines": [{"points": [[0, 0], ["d1 / 2", 0], ["d1 / 2", "l1"], ["d2 / 2", "l1"], ["d2 / 2", "l1 + l2"], ["d3 / 2", "l1 + l2"], ["d3 / 2", "l1 + l2 + l3"], ["d4 / 2", "l1 + l2 + l3"], ["d4 / 2", "l1 + l2 + l3 + l4"], [0, "l1 + l2 + l3 + l4"]]}]}},
+        {"command": "solid.revolve", "params": {"axis": "Z"}}
+      ]
+    }
+  },
+  {
+    "id": "shaft_keyway_d16",
+    "prompt": "shaft with diameter 16 and length 50 along Z, with a keyway cut from the top of the shaft at one end: width 5, depth 3 (measured from the top of the shaft), length 25 along the shaft, open at the end face",
+    "level": "medium",
+    "expect": {"size": [16, 16, 50], "volume": 9694.62, "cylindrical_faces": 1},
+    "reference": {
+      "summary": "shaft keyway d16",
+      "parameters": [{"name": "shaft_d", "expression": 16}, {"name": "shaft_len", "expression": 50}, {"name": "key_w", "expression": 5}, {"name": "key_depth", "expression": 3}, {"name": "key_len", "expression": 25}],
+      "steps": [
+        {"command": "solid.cylinder", "params": {"diameter": "shaft_d", "height": "shaft_len"}},
+        {"command": "solid.box", "params": {"size": ["key_w", "key_depth + 1", "key_len + 1"], "operation": "cut", "corner": ["-key_w / 2", "shaft_d / 2 - key_depth", "shaft_len - key_len"]}}
+      ]
+    }
+  },
+  {
+    "id": "slot_plate_100_40",
+    "prompt": "plate 100 x 40 x 6 mm with a central slot with fully rounded ends, 50 mm long overall and 10 mm wide, cut through the thickness, centred on the plate along its long side",
+    "level": "medium",
+    "expect": {"size": [100, 40, 6], "volume": 21128.76, "cylindrical_faces": 2},
+    "reference": {
+      "summary": "slot plate 100 40",
+      "parameters": [{"name": "plate_l", "expression": 100}, {"name": "plate_w", "expression": 40}, {"name": "plate_t", "expression": 6}, {"name": "slot_l", "expression": 50}, {"name": "slot_w", "expression": 10}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["plate_l", "plate_w", "plate_t"]}},
+        {"command": "solid.box", "params": {"size": ["slot_l - slot_w", "slot_w", "plate_t + 2"], "operation": "cut", "corner": ["(plate_l - slot_l) / 2 + slot_w / 2", "(plate_w - slot_w) / 2", -1]}},
+        {"command": "solid.cylinder", "params": {"diameter": "slot_w", "height": "plate_t + 2", "operation": "cut", "base": ["(plate_l - slot_l) / 2 + slot_w / 2", "plate_w / 2", -1]}},
+        {"command": "solid.cylinder", "params": {"diameter": "slot_w", "height": "plate_t + 2", "operation": "cut", "base": ["(plate_l + slot_l) / 2 - slot_w / 2", "plate_w / 2", -1]}}
+      ]
+    }
+  },
+  {
+    "id": "plate_with_boss_hole",
+    "prompt": "плита 60 x 60 x 8, по центру сверху цилиндрическая бобышка Ø30 высотой 12 (объединить с плитой), сквозное отверстие Ø10 по центру через бобышку и плиту",
+    "level": "medium",
+    "expect": {"size": [60, 60, 20], "volume": 35711.5, "cylindrical_faces": 2},
+    "reference": {
+      "summary": "plate with boss hole",
+      "parameters": [{"name": "plate_a", "expression": 60}, {"name": "plate_t", "expression": 8}, {"name": "boss_d", "expression": 30}, {"name": "boss_h", "expression": 12}, {"name": "hole_d", "expression": 10}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["plate_a", "plate_a", "plate_t"]}},
+        {"command": "solid.cylinder", "params": {"diameter": "boss_d", "height": "boss_h", "operation": "join", "base": ["plate_a / 2", "plate_a / 2", "plate_t"]}},
+        {"command": "solid.hole", "params": {"diameter": "hole_d", "points": [["plate_a / 2", "plate_a / 2", "plate_t + boss_h"]]}}
+      ]
+    }
+  },
+  {
+    "id": "l_bracket_base_holes",
+    "prompt": "L-bracket extruded 30 mm wide: base leg 70 mm long along X, upright leg 45 mm high along Y, thickness 4 mm; two 5 mm holes through the base, 12 mm from the free end of the base, at one quarter and three quarters of the width",
+    "level": "medium",
+    "expect": {"size": [70, 45, 30], "volume": 13162.92, "cylindrical_faces": 2},
+    "reference": {
+      "summary": "l bracket base holes",
+      "parameters": [{"name": "leg_a", "expression": 70}, {"name": "leg_b", "expression": 45}, {"name": "t", "expression": 4}, {"name": "width", "expression": 30}, {"name": "hole_d", "expression": 5}],
+      "steps": [
+        {"command": "sketch.create", "params": {"plane": "XY", "polylines": [{"points": [[0, 0], ["leg_a", 0], ["leg_a", "t"], ["t", "t"], ["t", "leg_b"], [0, "leg_b"]]}]}},
+        {"command": "solid.extrude", "params": {"distance": "width"}},
+        {"command": "solid.hole", "params": {"diameter": "hole_d", "points": [["leg_a - 12", 0, "width / 4"], ["leg_a - 12", 0, "width * 3 / 4"]], "face": "-Y", "depth": "t"}}
+      ]
+    }
+  },
+  {
+    "id": "cube_filleted",
+    "prompt": "куб со стороной 30 мм, все 12 рёбер скруглены радиусом 3",
+    "level": "medium",
+    "expect": {"size": [30, 30, 30], "volume": 26340.85, "cylindrical_faces": 12},
+    "reference": {
+      "summary": "cube filleted",
+      "parameters": [{"name": "side", "expression": 30}, {"name": "fillet_r", "expression": 3}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["side", "side", "side"]}},
+        {"command": "solid.fillet", "params": {"edges": "all", "radius": "fillet_r"}}
+      ]
+    }
+  },
+  {
+    "id": "cylinder_chamfered",
+    "prompt": "cylinder diameter 50, height 20, with a 2 mm chamfer on the top circular edge",
+    "level": "medium",
+    "expect": {"size": [50, 50, 20], "volume": 38964.13, "cylindrical_faces": 1},
+    "reference": {
+      "summary": "cylinder chamfered",
+      "parameters": [{"name": "cyl_d", "expression": 50}, {"name": "cyl_h", "expression": 20}, {"name": "chamfer", "expression": 2}],
+      "steps": [
+        {"command": "solid.cylinder", "params": {"diameter": "cyl_d", "height": "cyl_h"}},
+        {"command": "solid.chamfer", "params": {"edges": "top", "distance": "chamfer"}}
+      ]
+    }
+  },
+  {
+    "id": "block_corner_notch",
+    "prompt": "брусок 60 x 40 x 30; в углу (x от 0 до 30, y от 0 до 20) вырезан прямоугольный вырез на всю высоту",
+    "level": "medium",
+    "expect": {"size": [60, 40, 30], "volume": 54000, "cylindrical_faces": 0},
+    "reference": {
+      "summary": "block corner notch",
+      "parameters": [{"name": "block_l", "expression": 60}, {"name": "block_w", "expression": 40}, {"name": "block_h", "expression": 30}, {"name": "notch_l", "expression": 30}, {"name": "notch_w", "expression": 20}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["block_l", "block_w", "block_h"]}},
+        {"command": "solid.box", "params": {"size": ["notch_l", "notch_w", "block_h + 2"], "operation": "cut", "corner": [0, 0, -1]}}
+      ]
+    }
+  },
+  {
+    "id": "flanged_bushing",
+    "prompt": "flanged bushing along Z: a flange of diameter 40 and thickness 5 at the bottom, a tube of outer diameter 20 and height 25 on top of it (total height 30), and a 12 mm bore through the whole thing",
+    "level": "medium",
+    "expect": {"size": [40, 40, 30], "volume": 10744.25, "cylindrical_faces": 3},
+    "reference": {
+      "summary": "flanged bushing",
+      "parameters": [{"name": "flange_d", "expression": 40}, {"name": "flange_t", "expression": 5}, {"name": "tube_d", "expression": 20}, {"name": "tube_h", "expression": 25}, {"name": "bore_d", "expression": 12}],
+      "steps": [
+        {"command": "solid.cylinder", "params": {"diameter": "flange_d", "height": "flange_t"}},
+        {"command": "solid.cylinder", "params": {"diameter": "tube_d", "height": "tube_h", "operation": "join", "base": [0, 0, "flange_t"]}},
+        {"command": "solid.hole", "params": {"diameter": "bore_d", "points": [[0, 0, "flange_t + tube_h"]]}}
+      ]
+    }
+  },
+  {
+    "id": "plate_bolt_circle_45",
+    "prompt": "квадратная пластина 100 x 100, толщина 8, с центром в (50, 50); четыре отверстия Ø8 на окружности Ø70 вокруг центра пластины под углами 45°, 135°, 225°, 315°",
+    "level": "medium",
+    "expect": {"size": [100, 100, 8], "volume": 78391.5, "cylindrical_faces": 4},
+    "reference": {
+      "summary": "plate bolt circle 45",
+      "parameters": [{"name": "plate_a", "expression": 100}, {"name": "plate_t", "expression": 8}, {"name": "hole_d", "expression": 8}, {"name": "pcd", "expression": 70}],
+      "steps": [
+        {"command": "solid.box", "params": {"size": ["plate_a", "plate_a", "plate_t"]}},
+        {"command": "solid.hole", "params": {"diameter": "hole_d", "points": [["plate_a / 2 + pcd * 0.3535534", "plate_a / 2 + pcd * 0.3535534", "plate_t"], ["plate_a / 2 - pcd * 0.3535534", "plate_a / 2 + pcd * 0.3535534", "plate_t"], ["plate_a / 2 - pcd * 0.3535534", "plate_a / 2 - pcd * 0.3535534", "plate_t"], ["plate_a / 2 + pcd * 0.3535534", "plate_a / 2 - pcd * 0.3535534", "plate_t"]]}}
+      ]
+    }
+  },
+  {
+    "id": "cup_d50",
+    "prompt": "стакан: цилиндр Ø50 высотой 40, открытый сверху, толщина стенок и дна 2",
+    "level": "medium",
+    "expect": {"size": [50, 50, 40], "volume": 15387.52, "cylindrical_faces": 2},
+    "reference": {
+      "summary": "cup d50",
+      "parameters": [{"name": "cup_d", "expression": 50}, {"name": "cup_h", "expression": 40}, {"name": "wall", "expression": 2}],
+      "steps": [
+        {"command": "solid.cylinder", "params": {"diameter": "cup_d", "height": "cup_h"}},
+        {"command": "solid.shell", "params": {"faces": "top", "thickness": "wall"}}
+      ]
+    }
+  }
+]

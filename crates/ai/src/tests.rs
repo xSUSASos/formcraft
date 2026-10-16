@@ -283,3 +283,35 @@ fn log_dates() {
     assert_eq!(log::date(11016), (2000, 2, 29));
     assert_eq!(log::date(20742), (2026, 10, 16));
 }
+
+#[test]
+fn bench_references_match_their_expectations() {
+    let cases = bench::cases().expect("cases.json parses");
+    assert!(cases.len() >= 2);
+    let mut ids = std::collections::HashSet::new();
+    for c in &cases {
+        assert!(ids.insert(c.id.clone()), "duplicate id {}", c.id);
+        bench::check_reference(c).unwrap_or_else(|e| panic!("{}: {e}", c.id));
+    }
+}
+
+#[test]
+fn bench_scores_with_an_oracle_and_rejects_wrong_shapes() {
+    let cases: Vec<bench::Case> = bench::cases().unwrap().into_iter().take(2).collect();
+    let refs: Vec<(String, String)> =
+        cases.iter().map(|c| (c.prompt.clone(), serde_json::to_string(&c.reference).unwrap())).collect();
+    let oracle = Mock::with(move |req: &ChatRequest| {
+        let last = req.messages.last().map(|m| m.content.clone()).unwrap_or_default();
+        refs.iter().find(|(p, _)| last.contains(p.as_str())).map(|(_, r)| r.clone()).ok_or("unknown prompt".into())
+    });
+    let (_, g) = generator(oracle);
+    let report = bench::run(&g, &cases, &mut |_, _| {});
+    assert_eq!(report.valid_pct, 100.0, "{:#?}", report.cases);
+    assert_eq!(report.matched_pct, 100.0, "{:#?}", report.cases);
+    assert_eq!(report.rebuilt_pct, 100.0, "{:#?}", report.cases);
+    // a valid but wrong part: valid, not matched
+    let (_, g) = generator(Mock::with(|_| Ok(GOOD.to_string())));
+    let report = bench::run(&g, &cases, &mut |_, _| {});
+    assert_eq!(report.valid_pct, 100.0);
+    assert_eq!(report.matched_pct, 0.0);
+}

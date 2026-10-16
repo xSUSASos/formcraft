@@ -43,6 +43,13 @@ ollama create qwen2.5-coder:7b -f models/qwen2.5-coder-7b.Modelfile
 - CMake 4 отказывается от `cmake_minimum_required` < 3.5 в исходниках OCCT:
   `CMAKE_POLICY_VERSION_MINIMUM=3.5` (задано в `.cargo/config.toml`).
 
+## Фаза 6: плагины и скрипты (2026-10-16)
+- `rustup target add wasm32-wasip2` — установлен. Rust ≥ 1.82 собирает компоненты WASI 0.2 для
+  `wasm32-wasip2` напрямую (`wit-bindgen` в крейте плагина), поэтому `cargo-component` не нужен.
+- `wasm-tools` — `cargo install --locked wasm-tools` (проверка/печать WIT компонента).
+- Python 3.14.2 (`%LOCALAPPDATA%\Python\bin`) — для пакета `formcraft` (скрипты по control channel).
+- Ollama: модели `qwen2.5-coder:7b` и `qwen3:8b` (создан из GGUF 2026-10-16), обе на CPU.
+
 ## Linux (CI)
 
 `build-essential pkg-config libssl-dev cmake clang libxkbcommon-dev libwayland-dev libx11-dev

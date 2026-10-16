@@ -12,6 +12,10 @@ commands:
   ci       fmt --check, clippy -D warnings, test, layers, deny (stops at the first failure)
   layers   enforce the crate dependency layering (docs/architecture.md)
   deny     cargo deny check (licenses, advisories, bans, sources)
+  mcp-install      build formcraft-cli and copy it to target/mcp/ (the binary .mcp.json runs, so
+                   rebuilding target/debug is never blocked by a running MCP server)
+  ai-bench [args]  run the AI benchmark against the configured LLM (needs a running Ollama;
+                   args go to `formcraft-cli ai-bench`, e.g. --limit 10 --level simple)
 ";
 
 fn main() -> ExitCode {
@@ -20,6 +24,12 @@ fn main() -> ExitCode {
         Some("ci") => ci(),
         Some("layers") => layers(),
         Some("deny") => deny(),
+        Some("mcp-install") => mcp_install(),
+        Some("ai-bench") => {
+            let mut a = vec!["run", "--release", "-p", "formcraft-cli", "--", "ai-bench"];
+            a.extend(args.iter().skip(1).map(String::as_str));
+            cargo_step(&a)
+        }
         Some("-h" | "--help" | "help") | None => {
             print!("{USAGE}");
             Ok(())
@@ -33,6 +43,18 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+fn mcp_install() -> Result<(), String> {
+    cargo_step(&["build", "-p", "formcraft-cli"])?;
+    let exe = if cfg!(windows) { "formcraft-cli.exe" } else { "formcraft-cli" };
+    let dir = root().join("target").join("mcp");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let (from, to) = (root().join("target").join("debug").join(exe), dir.join(exe));
+    std::fs::copy(&from, &to)
+        .map_err(|e| format!("{} → {}: {e} (is the MCP server running?)", from.display(), to.display()))?;
+    eprintln!("installed {}", to.display());
+    Ok(())
 }
 
 /// Workspace root (parent of the xtask crate).

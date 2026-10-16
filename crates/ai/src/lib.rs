@@ -9,6 +9,7 @@
 )]
 
 pub mod backend;
+pub mod bench;
 pub mod commands;
 pub mod fewshot;
 pub mod http;
