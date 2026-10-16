@@ -14,6 +14,7 @@
     clippy::unreachable
 )]
 
+pub mod b64;
 mod mesh;
 mod profile;
 

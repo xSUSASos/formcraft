@@ -37,6 +37,8 @@ pub enum Status {
     Suppressed,
     RolledBack,
     Error(String),
+    /// Built, but with a caveat (e.g. a plugin body taken from the last saved result).
+    Warning(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -82,14 +84,37 @@ impl Model {
     }
 }
 
+/// Builds plugin features (implemented by the plugin host). `params` arrive with parameter
+/// expressions already evaluated to numbers.
+pub trait CustomFeatures: Send + Sync {
+    fn regenerate(&self, plugin: &str, kind: &str, params: &serde_json::Value) -> Result<Shape, String>;
+}
+
 pub(crate) struct Ctx<'a> {
     pub(crate) kernel: &'a dyn Kernel,
+    custom: Option<&'a dyn CustomFeatures>,
+    /// Non-fatal note for the feature being run (e.g. a frozen plugin body was used).
+    warning: Option<String>,
     params: HashMap<String, f64>,
     pub(crate) bodies: Vec<(BodyId, Shape)>,
     pub(crate) sketches: Vec<SketchResult>,
 }
 
 impl Ctx<'_> {
+    /// Numbers stay, strings that evaluate as expressions become numbers (recursively).
+    fn eval_json(&self, v: &serde_json::Value) -> serde_json::Value {
+        use serde_json::Value;
+        match v {
+            Value::String(s) => match Expr(s.clone()).eval(&|n| self.params.get(n).copied()) {
+                Ok(x) if x.is_finite() => serde_json::json!(x),
+                _ => v.clone(),
+            },
+            Value::Array(a) => Value::Array(a.iter().map(|x| self.eval_json(x)).collect()),
+            Value::Object(o) => Value::Object(o.iter().map(|(k, x)| (k.clone(), self.eval_json(x))).collect()),
+            other => other.clone(),
+        }
+    }
+
     pub(crate) fn num(&self, e: &Expr, what: &str) -> Result<f64, String> {
         e.eval(&|n| self.params.get(n).copied()).map_err(|err| format!("{what}: {err}"))
     }
@@ -197,11 +222,34 @@ fn run(ctx: &mut Ctx<'_>, f: &Feature) -> Result<(), String> {
             },
         ),
         FeatureKind::PressPull { body, face, distance } => features::run_press_pull(ctx, *body, face, distance),
+        FeatureKind::Custom { plugin, kind, params, op, frozen } => {
+            let evaluated = ctx.eval_json(params);
+            let built = match ctx.custom {
+                Some(c) => c.regenerate(plugin, kind, &evaluated),
+                None => Err(format!("plugin `{plugin}` is not loaded")),
+            };
+            let solid = match (built, frozen) {
+                (Ok(s), _) => s,
+                (Err(e), Some(bytes)) => {
+                    let data = formcraft_kernel::b64::decode(bytes)?;
+                    let s = k.deserialize(&data).map_err(|err| err.to_string())?;
+                    ctx.warning = Some(format!("{e}; showing the last saved result"));
+                    s
+                }
+                (Err(e), None) => return Err(e),
+            };
+            ctx.apply(f, *op, solid)
+        }
     }
 }
 
 /// Regenerate the document on `kernel`. Never panics; per-feature errors are in `status`.
 pub fn regen(doc: &Document, kernel: &dyn Kernel) -> Model {
+    regen_with(doc, kernel, None)
+}
+
+/// Regenerate with a provider for plugin features.
+pub fn regen_with(doc: &Document, kernel: &dyn Kernel, custom: Option<&dyn CustomFeatures>) -> Model {
     let mut model = Model::default();
     let params = match doc.parameter_values() {
         Ok(p) => p,
@@ -211,7 +259,7 @@ pub fn regen(doc: &Document, kernel: &dyn Kernel) -> Model {
             HashMap::new()
         }
     };
-    let mut ctx = Ctx { kernel, params, bodies: Vec::new(), sketches: Vec::new() };
+    let mut ctx = Ctx { kernel, custom, warning: None, params, bodies: Vec::new(), sketches: Vec::new() };
     let active = doc.active_features().len();
     for (i, f) in doc.features.iter().enumerate() {
         let status = if i >= active {
@@ -219,8 +267,12 @@ pub fn regen(doc: &Document, kernel: &dyn Kernel) -> Model {
         } else if f.suppressed {
             Status::Suppressed
         } else {
+            ctx.warning = None;
             match run(&mut ctx, f) {
-                Ok(()) => Status::Ok,
+                Ok(()) => match ctx.warning.take() {
+                    Some(w) => Status::Warning(w),
+                    None => Status::Ok,
+                },
                 Err(e) => Status::Error(e),
             }
         };

@@ -90,6 +90,8 @@ pub struct Session {
     file: Option<std::path::PathBuf>,
     /// Revision at the last save/open (unsaved changes when it differs).
     saved_revision: u64,
+    /// Builds plugin features (set by the plugin host).
+    custom: Option<Arc<dyn regen::CustomFeatures>>,
 }
 
 const LOG_LIMIT: usize = 1000;
@@ -114,6 +116,7 @@ impl Session {
             revision: 0,
             file: None,
             saved_revision: 0,
+            custom: None,
         };
         builtin::register(&mut s.registry);
         modeling::register(&mut s.registry);
@@ -181,7 +184,7 @@ impl Session {
     }
 
     fn regenerate(&mut self) {
-        self.model = regen::regen(&self.doc, self.kernel.as_ref());
+        self.model = regen::regen_with(&self.doc, self.kernel.as_ref(), self.custom.as_deref());
         self.selection.retain_bodies(&self.model);
         self.revision = self.revision.wrapping_add(1);
     }
@@ -197,7 +200,7 @@ impl Session {
     ) -> Result<T> {
         let mut next = (*self.doc).clone();
         let out = f(&mut next)?;
-        let model = regen::regen(&next, self.kernel.as_ref());
+        let model = regen::regen_with(&next, self.kernel.as_ref(), self.custom.as_deref());
         check(&out, &model)?;
         let prev = std::mem::replace(&mut self.doc, Arc::new(next));
         self.undo.push((label.to_string(), prev));
@@ -226,6 +229,7 @@ impl Session {
             revision: self.revision,
             file: None,
             saved_revision: self.revision,
+            custom: self.custom.clone(),
         }
     }
 
@@ -291,6 +295,70 @@ impl Session {
         self.undo.push((label.clone(), cur));
         self.regenerate();
         Ok(label)
+    }
+
+    /// Install (or remove) the builder of plugin features and rebuild the model with it.
+    pub fn set_custom_features(&mut self, custom: Option<Arc<dyn regen::CustomFeatures>>) {
+        self.custom = custom;
+        self.regenerate();
+    }
+
+    pub fn custom_features(&self) -> Option<&Arc<dyn regen::CustomFeatures>> {
+        self.custom.as_ref()
+    }
+
+    /// Add a plugin feature (one undo step). The body is built once here to keep a frozen copy
+    /// in the document (shown if the plugin is missing later). `params` may hold expressions.
+    pub fn add_custom_feature(
+        &mut self,
+        plugin: &str,
+        kind: &str,
+        label: &str,
+        params: Value,
+        op: doc::BodyOp,
+    ) -> Result<Value> {
+        let custom =
+            self.custom.clone().ok_or_else(|| EngineError::Failed(format!("plugin `{plugin}` is not loaded")))?;
+        let evaluated = self.eval_params(&params);
+        let solid = custom.regenerate(plugin, kind, &evaluated).map_err(EngineError::Failed)?;
+        let frozen = self.kernel.serialize(&solid).ok().map(|b| kernel::b64::encode(&b));
+        let feature = doc::FeatureKind::Custom { plugin: plugin.into(), kind: kind.into(), params, op, frozen };
+        let base = label.to_string();
+        let id = self.edit(
+            &format!("Add {label}"),
+            |d| {
+                let id = d.add_feature(feature)?;
+                let name = (1..).map(|i| format!("{base}{i}")).find(|n| !d.features.iter().any(|f| &f.name == n));
+                if let (Some(f), Some(n)) = (d.feature_mut(id), name) {
+                    f.name = n;
+                }
+                Ok(id)
+            },
+            |id, m| match m.status.iter().find(|s| s.id == *id).map(|s| &s.status) {
+                Some(regen::Status::Error(e)) => Err(EngineError::Failed(e.clone())),
+                _ => Ok(()),
+            },
+        )?;
+        let name = self.doc.feature(id).map(|f| f.name.clone()).unwrap_or_default();
+        Ok(serde_json::json!({"feature": id.0, "message": format!("{name} added")}))
+    }
+
+    /// Parameter expressions inside a JSON value evaluated to numbers (strings that are not
+    /// expressions stay strings).
+    pub fn eval_params(&self, v: &Value) -> Value {
+        let vals = self.doc.parameter_values().unwrap_or_default();
+        fn walk(v: &Value, vals: &std::collections::HashMap<String, f64>) -> Value {
+            match v {
+                Value::String(s) => match doc::Expr(s.clone()).eval(&|n| vals.get(n).copied()) {
+                    Ok(x) if x.is_finite() => serde_json::json!(x),
+                    _ => v.clone(),
+                },
+                Value::Array(a) => Value::Array(a.iter().map(|x| walk(x, vals)).collect()),
+                Value::Object(o) => Value::Object(o.iter().map(|(k, x)| (k.clone(), walk(x, vals))).collect()),
+                other => other.clone(),
+            }
+        }
+        walk(v, &vals)
     }
 
     pub fn kernel(&self) -> &Arc<dyn kernel::Kernel> {

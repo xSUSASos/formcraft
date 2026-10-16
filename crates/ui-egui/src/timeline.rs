@@ -285,6 +285,8 @@ fn feature_tile(
     icons::paint(ui.painter(), r.shrink(SIZE.grid / 2.0), icon_for(f.kind.base_name()), color, t);
     if err {
         ui.painter().rect_stroke(r, radius, Stroke::new(2.0, t.error), StrokeKind::Inside);
+    } else if matches!(status, Some(Status::Warning(_))) {
+        ui.painter().rect_stroke(r, radius, Stroke::new(2.0, t.warning), StrokeKind::Inside);
     } else if selected {
         ui.painter().rect_stroke(r, radius, Stroke::new(1.5, t.accent), StrokeKind::Inside);
     }
@@ -297,6 +299,7 @@ fn feature_tile(
     }
     let tip = match status {
         Some(Status::Error(e)) => format!("{}\nError: {e}", f.name),
+        Some(Status::Warning(w)) => format!("{}\nWarning: {w}", f.name),
         Some(Status::Suppressed) => format!("{} (suppressed)", f.name),
         Some(Status::RolledBack) => format!("{} (rolled back)", f.name),
         _ => f.name.clone(),

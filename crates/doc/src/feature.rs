@@ -132,6 +132,19 @@ pub enum FeatureKind {
         face: FaceSel,
         distance: Expr,
     },
+    /// A plugin's feature (ADR 0003): rebuilt by the plugin from `params` (numbers may be
+    /// expressions). `frozen` keeps the last good body (base64 BREP) so the feature still
+    /// shows its result when the plugin is missing.
+    Custom {
+        plugin: String,
+        kind: String,
+        #[serde(default)]
+        params: serde_json::Value,
+        #[serde(default)]
+        op: BodyOp,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        frozen: Option<String>,
+    },
     /// Boolean between two existing bodies; the tool body is consumed unless `keep_tool`.
     Combine {
         target: BodyId,
@@ -232,6 +245,7 @@ impl FeatureKind {
             FeatureKind::Shell { .. } => "Shell",
             FeatureKind::Hole { .. } => "Hole",
             FeatureKind::PressPull { .. } => "PressPull",
+            FeatureKind::Custom { .. } => "Custom",
         }
     }
 
@@ -241,7 +255,8 @@ impl FeatureKind {
             | FeatureKind::Cylinder { op, .. }
             | FeatureKind::Sphere { op, .. }
             | FeatureKind::Extrude { op, .. }
-            | FeatureKind::Revolve { op, .. } => Some(*op),
+            | FeatureKind::Revolve { op, .. }
+            | FeatureKind::Custom { op, .. } => Some(*op),
             _ => None,
         }
     }

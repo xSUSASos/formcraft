@@ -11,6 +11,7 @@ publish = false
 workspace = true
 
 [dependencies]
+serde_json = { workspace = true }
 formcraft-kernel = { workspace = true }
 formcraft-sketch = { workspace = true }
 formcraft-doc = { workspace = true }

@@ -110,6 +110,8 @@ pub fn feature(d: &Document, p: &Value, key: &str) -> Result<FeatureId> {
             .features
             .iter()
             .find(|f| f.name == *s)
+            // "2" means the id 2 (LLMs and scripts often quote numbers)
+            .or_else(|| s.trim().parse::<u32>().ok().and_then(|n| d.feature(FeatureId(n))))
             .map(|f| f.id)
             .ok_or_else(|| bad(format!("`{key}`: no feature named `{s}`"))),
         _ => Err(bad(format!("missing `{key}` (feature id or name)"))),

@@ -460,3 +460,51 @@ fn join_without_target_uses_the_latest_body() {
     let v = s.execute("model.inspect", &json!({})).unwrap();
     assert!((v["bodies"][0]["volume"].as_f64().unwrap() - (2000.0 - 125.0)).abs() < 1e-6);
 }
+
+/// A stand-in plugin: `block {w, h}` → a w×w×h box.
+struct Blocks;
+impl formcraft_regen::CustomFeatures for Blocks {
+    fn regenerate(&self, plugin: &str, kind: &str, p: &Value) -> std::result::Result<formcraft_kernel::Shape, String> {
+        if plugin != "blocks" || kind != "block" {
+            return Err(format!("unknown feature {plugin}.{kind}"));
+        }
+        let w = p["w"].as_f64().ok_or("w must be a number")?;
+        let h = p["h"].as_f64().ok_or("h must be a number")?;
+        use formcraft_kernel::Kernel;
+        formcraft_occt::Occt
+            .make_box(formcraft_kernel::DVec3::ZERO, formcraft_kernel::DVec3::new(w, w, h))
+            .map_err(|e| e.to_string())
+    }
+}
+
+#[test]
+fn custom_features_rebuild_and_fall_back_to_frozen() {
+    let mut s = session();
+    assert!(s.add_custom_feature("blocks", "block", "Block", json!({"w": 10, "h": 2}), doc::BodyOp::NewBody).is_err());
+    s.set_custom_features(Some(std::sync::Arc::new(Blocks)));
+    s.execute("doc.parameter", &json!({"name": "W", "expression": 10})).unwrap();
+    s.add_custom_feature("blocks", "block", "Block", json!({"w": "W", "h": 2}), doc::BodyOp::NewBody).unwrap();
+    assert_eq!(s.document().features[0].name, "Block1");
+    let vol =
+        |s: &mut Session| s.execute("model.inspect", &json!({})).unwrap()["bodies"][0]["volume"].as_f64().unwrap();
+    assert!((vol(&mut s) - 200.0).abs() < 1e-6);
+    s.execute("doc.parameter", &json!({"name": "W", "expression": 20})).unwrap();
+    assert!((vol(&mut s) - 800.0).abs() < 1e-6, "rebuilt from the parameter");
+    // the plugin goes away: the frozen body (from creation) is shown with a warning
+    s.set_custom_features(None);
+    assert!((vol(&mut s) - 200.0).abs() < 1e-6);
+    assert!(matches!(s.model().status[0].status, formcraft_regen::Status::Warning(_)));
+    // editing goes through the plugin's command id
+    let p = s.execute("feature.params", &json!({"feature": "Block1"})).unwrap();
+    assert_eq!(p["command"], "blocks.block");
+}
+
+#[test]
+fn base64_round_trips() {
+    use formcraft_kernel::b64;
+    for data in [&b""[..], b"f", b"fo", b"foo", b"foobar", &[0u8, 255, 128, 7][..]] {
+        assert_eq!(b64::decode(&b64::encode(data)).unwrap(), data);
+    }
+    assert!(b64::decode("abc").is_err());
+    assert!(b64::decode("ab!d").is_err());
+}

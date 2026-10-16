@@ -35,7 +35,7 @@ fn profiles_param(p: &ProfileSel) -> Value {
 
 /// The command that creates a feature of this kind and the parameters that recreate it.
 /// Sketches are edited in sketch mode, not through a command dialog (None).
-pub fn command_for(kind: &FeatureKind) -> Option<(&'static str, Value)> {
+pub fn command_for(kind: &FeatureKind) -> Option<(String, Value)> {
     let x = |e: &formcraft_doc::Expr| json!(e.as_str());
     let v3 = |v: &formcraft_doc::Vec3Expr| json!([v.0[0].as_str(), v.0[1].as_str(), v.0[2].as_str()]);
     Some(match kind {
@@ -107,7 +107,14 @@ pub fn command_for(kind: &FeatureKind) -> Option<(&'static str, Value)> {
             ("solid.combine", json!({"target": target.0, "tool": tool.0, "operation": op, "keep_tools": keep_tool}))
         }
         FeatureKind::Sketch { plane: SketchPlane::Origin { .. } | SketchPlane::Face { .. }, .. } => return None,
+        // A plugin feature is edited through the plugin's command `<plugin>.<kind>`.
+        FeatureKind::Custom { plugin, kind, params, op, .. } => {
+            let mut v = if params.is_object() { params.clone() } else { json!({}) };
+            op_params(op, &mut v);
+            return Some((format!("{plugin}.{kind}"), v));
+        }
     })
+    .map(|(c, v)| (c.to_string(), v))
 }
 
 impl Session {
@@ -115,6 +122,7 @@ impl Session {
     pub fn scratch(&self) -> Session {
         let mut s = Session::with_kernel(self.kernel.clone());
         s.registry = self.registry.clone();
+        s.custom = self.custom.clone();
         s.doc = self.doc.clone();
         s.model = self.model.clone();
         s
@@ -162,7 +170,7 @@ fn feature_edit(s: &mut Session, p: &Value) -> Result<Value> {
             m.insert(k.clone(), v.clone());
         }
     }
-    let kind = rebuilt_kind(s, id, cmd, &merged)?;
+    let kind = rebuilt_kind(s, id, &cmd, &merged)?;
     if s.document().feature(id).map(|f| std::mem::discriminant(&f.kind)) != Some(std::mem::discriminant(&kind)) {
         return Err(EngineError::Failed("edit changed the feature type".into()));
     }
@@ -194,7 +202,7 @@ fn feature_params(s: &mut Session, p: &Value) -> Result<Value> {
 pub(crate) fn register(r: &mut Registry) {
     let cmds: Vec<(CommandSpec, Handler)> = vec![
         (
-            CommandSpec::new("feature.edit", "Edit Feature", "Change parameters of an existing timeline feature (missing params keep their values).")
+            CommandSpec::new("feature.edit", "Edit Feature", "Change parameters of a feature that already exists on the timeline, by its name (e.g. Extrude1); missing params keep their values. Not needed while building a new part.")
                 .params(json!({"type": "object", "required": ["feature", "params"], "properties": {
                     "feature": {"type": ["integer", "string"]}, "params": {"type": "object"}}}))
                 .ai()
