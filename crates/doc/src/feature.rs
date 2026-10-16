@@ -132,6 +132,11 @@ pub enum FeatureKind {
         face: FaceSel,
         distance: Expr,
     },
+    /// A solid imported from a file (STEP): the base body, stored as base64 BREP.
+    Import {
+        source: String,
+        brep: String,
+    },
     /// A plugin's feature (ADR 0003): rebuilt by the plugin from `params` (numbers may be
     /// expressions). `frozen` keeps the last good body (base64 BREP) so the feature still
     /// shows its result when the plugin is missing.
@@ -246,6 +251,7 @@ impl FeatureKind {
             FeatureKind::Hole { .. } => "Hole",
             FeatureKind::PressPull { .. } => "PressPull",
             FeatureKind::Custom { .. } => "Custom",
+            FeatureKind::Import { .. } => "Import",
         }
     }
 
@@ -257,6 +263,7 @@ impl FeatureKind {
             | FeatureKind::Extrude { op, .. }
             | FeatureKind::Revolve { op, .. }
             | FeatureKind::Custom { op, .. } => Some(*op),
+            FeatureKind::Import { .. } => Some(BodyOp::NewBody),
             _ => None,
         }
     }

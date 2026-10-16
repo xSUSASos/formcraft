@@ -133,6 +133,8 @@ pub struct FormCraftApp {
     addins: crate::addins::AddIns,
     /// Port of the running control channel (scripts connect to it).
     control_port: Option<u16>,
+    /// Section Analysis view: plane, offset and the cut model for a revision.
+    section: Option<(String, f64, Option<(u64, formcraft_engine::regen::Model)>)>,
 }
 
 /// Marks screenshots requested through the control channel.
@@ -241,6 +243,7 @@ impl FormCraftApp {
             ai_tint: None,
             addins: crate::addins::AddIns::new(),
             control_port: None,
+            section: None,
         };
         if let Some(path) = app.options.script.clone() {
             app.run_script_file(&path);
@@ -697,6 +700,11 @@ impl FormCraftApp {
                 self.open_assistant(false);
                 return;
             }
+            "inspect.section" if params.is_null() => {
+                let (plane, offset) = self.section.as_ref().map_or(("XY".to_string(), 0.0), |s| (s.0.clone(), s.1));
+                self.open_dialog(id, &serde_json::json!({"plane": plane, "offset": offset}), None);
+                return;
+            }
             _ => {}
         }
         if params.is_null() && self.sketch_command(id) {
@@ -1041,7 +1049,15 @@ impl FormCraftApp {
             && dlg.previewed.as_ref() != Some(&params)
         {
             dlg.previewed = Some(params.clone());
-            match self.session.preview(&cmd, &params) {
+            let previewed = if cmd == "inspect.section" {
+                let plane = params.get("plane").and_then(Value::as_str).unwrap_or("XY").to_string();
+                let offset =
+                    self.session.eval_params(params.get("offset").unwrap_or(&Value::Null)).as_f64().unwrap_or(0.0);
+                self.session.section_model(&plane, offset)
+            } else {
+                self.session.preview(&cmd, &params)
+            };
+            match previewed {
                 Ok(m) => {
                     // Tint what the operation produces: new bodies and the target body.
                     let op = params.get("operation").and_then(Value::as_str).unwrap_or("new_body");
@@ -1076,6 +1092,10 @@ impl FormCraftApp {
             Outcome::Ok => match dlg.invocation() {
                 Ok((cmd, params)) => match self.session.execute(&cmd, &params) {
                     Ok(v) => {
+                        if cmd == "inspect.section" {
+                            let plane = v["plane"].as_str().unwrap_or("XY").to_string();
+                            self.section = Some((plane, v["offset"].as_f64().unwrap_or(0.0), None));
+                        }
                         self.status = v.get("message").and_then(Value::as_str).unwrap_or("Done").to_string();
                         self.preview = None;
                         self.viewport.set_tint(Default::default());
@@ -1755,12 +1775,24 @@ impl FormCraftApp {
         self.navigate(ui, &resp, rect, size);
 
         let ai = if self.preview.is_none() { self.ai_preview(t) } else { None };
+        // Section Analysis view (kept until Esc), recomputed when the model changes
+        let rev = self.session.revision();
+        if let Some((plane, offset, cache)) = self.section.as_mut()
+            && cache.as_ref().is_none_or(|(r, _)| *r != rev)
+        {
+            *cache = self.session.section_model(plane, *offset).ok().map(|m| (rev, m));
+        }
+        let section = if self.preview.is_none() && ai.is_none() {
+            self.section.as_ref().and_then(|s| s.2.as_ref()).map(|(r, m)| (m, u64::MAX / 4 + r))
+        } else {
+            None
+        };
         if self.preview.is_none() {
             // no dialog preview → the AI proposal's tint, or none
             let tint = if ai.is_some() { self.ai_tint.as_ref().map(|(_, m)| m.clone()) } else { None };
             self.viewport.set_tint(tint.unwrap_or_default());
         }
-        let shown = self.preview.as_ref().map(|(m, k)| (m, *k)).or(ai.as_ref().map(|(m, k)| (m, *k)));
+        let shown = self.preview.as_ref().map(|(m, k)| (m, *k)).or(ai.as_ref().map(|(m, k)| (m, *k))).or(section);
         // Bodies, grid and axes on the GPU (with depth); without a GPU (tests) the grid is
         // painted in 2D below.
         let gpu = self.viewport.paint(
@@ -2152,6 +2184,10 @@ impl FormCraftApp {
             if let Some(tool) = key {
                 m.set_tool(tool);
             }
+        }
+        if self.section.is_some() && self.dialog.is_none() && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+            self.section = None;
+            self.status = "Section Analysis off".into();
         }
         if ui.input_mut(|i| i.consume_key(egui::Modifiers::SHIFT, egui::Key::S)) {
             self.addins.open = !self.addins.open;

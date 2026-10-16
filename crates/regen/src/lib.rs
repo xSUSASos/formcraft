@@ -222,6 +222,11 @@ fn run(ctx: &mut Ctx<'_>, f: &Feature) -> Result<(), String> {
             },
         ),
         FeatureKind::PressPull { body, face, distance } => features::run_press_pull(ctx, *body, face, distance),
+        FeatureKind::Import { brep, .. } => {
+            let data = formcraft_kernel::b64::decode(brep)?;
+            let solid = k.deserialize(&data).map_err(|e| format!("imported body: {e}"))?;
+            ctx.apply(f, BodyOp::NewBody, solid)
+        }
         FeatureKind::Custom { plugin, kind, params, op, frozen } => {
             let evaluated = ctx.eval_json(params);
             let built = match ctx.custom {

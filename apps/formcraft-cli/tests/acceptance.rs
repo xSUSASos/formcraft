@@ -95,6 +95,37 @@ fn main() -> ExitCode {
         println!("test freecad_opens_step ... skipped (set FREECAD_CMD)");
     }
 
+    // Phase 7: STEP import as a base body that later features build on; 3MF export
+    let script = dir.join("import.fcs");
+    let tmf = dir.join("imported.3mf");
+    let text = format!(
+        "doc.import {{\"path\": {:?}}}
+solid.chamfer {{\"edges\": \"top_outer\", \"distance\": 1}}
+doc.export {{\"path\": {:?}}}
+",
+        step.display().to_string(),
+        tmf.display().to_string()
+    );
+    let _ = std::fs::write(&script, text);
+    let r = cli().arg("--no-plugins").arg("run").arg(&script).arg("--quiet").output();
+    match r {
+        Ok(o) if o.status.success() => {
+            let v: Value = serde_json::from_slice(&o.stdout).unwrap_or(Value::Null);
+            let vol = v["bodies"][0]["volume"].as_f64().unwrap_or(0.0);
+            let feats: Vec<&str> =
+                v["features"].as_array().into_iter().flatten().filter_map(|f| f["type"].as_str()).collect();
+            check(
+                "step_import_is_a_base_body",
+                feats.first() == Some(&"Import") && vol > expected_volume() * 0.95 && vol < expected_volume(),
+                format!("{feats:?} {vol}"),
+                &mut failed,
+            );
+            let zip_ok = std::fs::read(&tmf).is_ok_and(|b| b.starts_with(b"PK"));
+            check("export_3mf", zip_ok, tmf.display().to_string(), &mut failed);
+        }
+        other => check("step_import_is_a_base_body", false, format!("{other:?}"), &mut failed),
+    }
+
     let _ = std::fs::remove_dir_all(&dir);
     println!("acceptance: {failed} failed");
     if failed == 0 { ExitCode::SUCCESS } else { ExitCode::FAILURE }

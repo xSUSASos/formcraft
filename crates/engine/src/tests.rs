@@ -508,3 +508,41 @@ fn base64_round_trips() {
     assert!(b64::decode("abc").is_err());
     assert!(b64::decode("ab!d").is_err());
 }
+
+#[test]
+fn inspect_measures_properties_and_sections() {
+    let mut s = session();
+    s.execute("solid.box", &json!({"size": [100, 50, 20]})).unwrap();
+    s.execute("solid.hole", &json!({"points": [[50, 25, 20]], "diameter": 10})).unwrap();
+    let pi = std::f64::consts::PI;
+    let vol = 100.0 * 50.0 * 20.0 - pi * 25.0 * 20.0;
+    // properties with a material: mm³ → cm³ × 2.70
+    let p = s.execute("inspect.properties", &json!({"material": "aluminium"})).unwrap();
+    assert!((p["mass_g"].as_f64().unwrap() - vol * 1e-3 * 2.70).abs() < 1e-6, "{p}");
+    assert!(s.execute("inspect.properties", &json!({"material": "unobtainium"})).is_err());
+    assert!(s.execute("inspect.properties", &json!({"density": -1})).is_err());
+    // two parallel faces: the exact gap
+    let m = s
+        .execute(
+            "inspect.measure",
+            &json!({"a": {"body": "Body1", "face": "top"}, "b": {"body": "Body1", "face": "bottom"}}),
+        )
+        .unwrap();
+    assert!((m["distance"].as_f64().unwrap() - 20.0).abs() < 1e-9, "{m}");
+    assert!((m["angle_deg"].as_f64().unwrap() - 180.0).abs() < 1e-6, "{m}");
+    // one entity: the hole's cylindrical face
+    let h = s.execute("inspect.measure", &json!({"a": {"body": "Body1", "face": {"near": [55, 25, 10]}}})).unwrap();
+    assert!((h["diameter"].as_f64().unwrap() - 10.0).abs() < 1e-6, "{h}");
+    // the selection works too
+    let b = s.model().bodies[0].id;
+    s.selection_mut().set(Pick::Body { body: b });
+    let one = s.execute("inspect.measure", &json!({})).unwrap();
+    assert!((one["volume_mm3"].as_f64().unwrap() - vol).abs() < 1e-6);
+    // section through the hole at z = 10: 100×50 minus the hole
+    let sec = s.execute("inspect.section", &json!({"plane": "XY", "offset": 10})).unwrap();
+    assert!((sec["section_area_mm2"].as_f64().unwrap() - (5000.0 - pi * 25.0)).abs() < 1e-3, "{sec}");
+    let sec = s.execute("inspect.section", &json!({"plane": "YZ", "offset": 30})).unwrap();
+    assert!((sec["section_area_mm2"].as_f64().unwrap() - 1000.0).abs() < 1e-3, "{sec}");
+    assert!(s.execute("inspect.section", &json!({"plane": "AB"})).is_err());
+    assert_eq!(s.document().features.len(), 2, "inspect never changes the model");
+}

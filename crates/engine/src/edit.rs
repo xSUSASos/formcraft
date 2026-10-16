@@ -107,6 +107,8 @@ pub fn command_for(kind: &FeatureKind) -> Option<(String, Value)> {
             ("solid.combine", json!({"target": target.0, "tool": tool.0, "operation": op, "keep_tools": keep_tool}))
         }
         FeatureKind::Sketch { plane: SketchPlane::Origin { .. } | SketchPlane::Face { .. }, .. } => return None,
+        // An imported body has nothing to edit.
+        FeatureKind::Import { .. } => return None,
         // A plugin feature is edited through the plugin's command `<plugin>.<kind>`.
         FeatureKind::Custom { plugin, kind, params, op, .. } => {
             let mut v = if params.is_object() { params.clone() } else { json!({}) };

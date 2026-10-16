@@ -172,6 +172,52 @@ fn doc_save(s: &mut Session, p: &Value) -> Result<Value> {
     Ok(json!({"path": path.display().to_string(), "message": format!("Saved {}", path.display())}))
 }
 
+/// Import the solids of a STEP file as base bodies (one Import feature each, one undo step).
+fn doc_import(s: &mut Session, p: &Value) -> Result<Value> {
+    let path = PathBuf::from(params::str(p, "path")?);
+    let solids = formcraft_io::import_step(s.kernel().as_ref(), &path)?;
+    if solids.len() > 1000 {
+        return Err(EngineError::Failed("the file has more than 1000 solids".into()));
+    }
+    let stem = path.file_stem().and_then(|x| x.to_str()).unwrap_or("Imported").to_string();
+    let k = s.kernel().clone();
+    let mut kinds = Vec::new();
+    for solid in &solids {
+        let bytes = k.serialize(solid)?;
+        kinds.push(FeatureKind::Import {
+            source: path.display().to_string(),
+            brep: formcraft_kernel::b64::encode(&bytes),
+        });
+    }
+    let n = kinds.len();
+    let ((), added) = s.transaction(&format!("Import {stem}"), None, |s| {
+        s.edit(
+            &format!("Import {stem}"),
+            |d| {
+                for (i, kind) in kinds.into_iter().enumerate() {
+                    let id = d.add_feature(kind)?;
+                    let name = if n == 1 { stem.clone() } else { format!("{stem}_{}", i + 1) };
+                    if let Some(b) = d.bodies.get_mut(&formcraft_doc::BodyId(id.0)) {
+                        b.name = name;
+                    }
+                }
+                Ok(())
+            },
+            |_, m| {
+                if m.error_count() == 0 {
+                    Ok(())
+                } else {
+                    Err(EngineError::Failed("the imported body did not rebuild".into()))
+                }
+            },
+        )
+    })?;
+    Ok(
+        json!({"path": path.display().to_string(), "bodies": n, "features": added.iter().map(|f| f.0).collect::<Vec<_>>(),
+              "message": format!("Imported {n} body(ies) from {}", path.display())}),
+    )
+}
+
 fn doc_open(s: &mut Session, p: &Value) -> Result<Value> {
     let path = PathBuf::from(params::str(p, "path")?);
     let (doc, _) = formcraft_io::fcraft::open(&path)?;
@@ -482,6 +528,13 @@ pub(crate) fn register(r: &mut Registry) {
                 .params(json!({"type": "object", "properties": {"path": {"type": "string"}}}))
                 .shortcut("Ctrl+S"),
             h(doc_save),
+        ),
+        (
+            CommandSpec::new("doc.import", "Import STEP", "Import the solids of a STEP file as base bodies of the design (they can be cut, filleted, shelled…).")
+                .params(json!({"type": "object", "required": ["path"], "properties": {"path": {"type": "string"}}}))
+                .undoable()
+                .icon("doc"),
+            h(doc_import),
         ),
         (
             CommandSpec::new("doc.open", "Open", "Open a .fcraft design (the current one is replaced).")

@@ -11,6 +11,7 @@
 mod builtin;
 pub mod edit;
 mod features3;
+pub mod inspect;
 mod modeling;
 pub mod params;
 mod registry;
@@ -129,6 +130,7 @@ impl Session {
         features3::register(&mut s.registry);
         edit::register(&mut s.registry);
         sketch_edit::register(&mut s.registry);
+        inspect::register(&mut s.registry);
         s
     }
 
