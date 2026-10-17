@@ -23,6 +23,8 @@ pub const SCENES: &[(&str, &str)] = &[
     ("7-ai-group", "AI group on the timeline (+ Assistant panel)"),
     ("8-error", "Feature error on the timeline (+ toast)"),
     ("9-addins", "Add-in: Spur Gear button and feature, Scripts and Add-Ins dialog"),
+    ("10-section", "Section Analysis through the holes"),
+    ("11-settings", "Preferences window"),
 ];
 
 const PLATE: &[(&str, &str)] = &[
@@ -115,6 +117,12 @@ pub fn render(scene: &str, theme: ThemeKind, size: [u32; 2]) -> Result<image::Rg
         FormCraftApp::with_state_and_session(scene_layout(), Camera::home(), options(scene, theme), pre.take_session());
     if scene != "4-sketch" {
         app.fit_view();
+    }
+    if scene == "10-section" {
+        app.show_section("XZ", 20.0);
+    }
+    if scene == "11-settings" {
+        app.open_settings();
     }
     if scene == "9-addins" {
         let gear = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/plugins/gear");

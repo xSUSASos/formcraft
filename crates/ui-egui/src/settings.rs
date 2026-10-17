@@ -83,6 +83,7 @@ pub fn window(
         .collapsible(false)
         .resizable(false)
         .default_width(SIZE.assistant_w)
+        .default_pos(ui.ctx().content_rect().center() - egui::vec2(SIZE.assistant_w * 0.6, SIZE.assistant_w * 0.6))
         .open(open)
         .show(ui.ctx(), |ui| {
             egui::Grid::new("settings_grid").num_columns(2).spacing([SIZE.grid * 3.0, SIZE.grid * 2.0]).show(

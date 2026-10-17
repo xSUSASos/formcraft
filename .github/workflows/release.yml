@@ -34,7 +34,7 @@ jobs:
 
       - name: WiX (msi)
         if: runner.os == 'Windows'
-        run: dotnet tool install --global wix
+        run: dotnet tool install --global wix --version 5.0.2
 
       - uses: dtolnay/rust-toolchain@stable
 

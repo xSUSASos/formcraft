@@ -2,7 +2,7 @@
 //!
 //! - every platform: a portable archive `dist/FormCraft-<version>-<os>-x64.zip` with the app,
 //!   the CLI, the example add-ins (built components), scripts, the Python client and docs;
-//! - Windows: an `.msi` when the WiX toolset (`wix`, `dotnet tool install --global wix`) is
+//! - Windows: an `.msi` when the WiX toolset (`wix`, `dotnet tool install --global wix --version 5.0.2`; WiX 7 needs its OSMF EULA accepted) is
 //!   installed — per-user install into `%LOCALAPPDATA%\Programs\FormCraft`, Start-menu entry;
 //! - Linux: an AppImage via `packaging/linux/build-appimage.sh` (needs `linuxdeploy`).
 
@@ -156,7 +156,9 @@ pub fn dist(args: &[String]) -> Result<(), String> {
         wix.arg("build").arg(&wxs).arg("-o").arg(&msi);
         match run(wix, "wix build") {
             Ok(()) => eprintln!("msi: {}", msi.display()),
-            Err(e) => eprintln!("msi skipped ({e}); install WiX: dotnet tool install --global wix"),
+            Err(e) => eprintln!(
+                "msi skipped ({e}); install WiX 5: dotnet tool install --global wix --version 5.0.2 (WiX 7 needs its OSMF EULA accepted)"
+            ),
         }
     } else if cfg!(target_os = "linux") {
         let mut sh = Command::new("bash");

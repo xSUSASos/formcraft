@@ -327,6 +327,18 @@ impl FormCraftApp {
                 }
             }
         }
+        // add-ins shipped next to the executable (installed versions above take precedence)
+        if installed
+            && let Some(bundled) = std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.join("plugins")))
+        {
+            for (d, r) in plugins.load_all(&bundled, &mut self.session) {
+                if let Err(e) = r.as_ref().map_err(|e| e.to_string())
+                    && !e.contains("already loaded")
+                {
+                    failed.push(format!("{}: {e}", d.display()));
+                }
+            }
+        }
         for d in self.options.plugin_dirs.clone() {
             if let Err(e) = plugins.load(&d, &mut self.session) {
                 failed.push(e.to_string());
@@ -574,6 +586,16 @@ impl FormCraftApp {
     /// Load this add-in folder when plugins start (screenshots, tests).
     pub(crate) fn add_plugin_dir(&mut self, dir: PathBuf) {
         self.options.plugin_dirs.push(dir);
+    }
+
+    /// Section Analysis view (screenshots).
+    pub(crate) fn show_section(&mut self, plane: &str, offset: f64) {
+        self.section = Some((plane.to_string(), offset, None));
+    }
+
+    /// Show Preferences (screenshots).
+    pub(crate) fn open_settings(&mut self) {
+        self.settings_open = true;
     }
 
     /// Show Scripts and Add-Ins (screenshots).
