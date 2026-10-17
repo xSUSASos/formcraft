@@ -24,7 +24,7 @@
 - **GPU для ИИ:** Ollama 0.40.4 не видит RTX 4050 → всё на CPU: 1–3 мин на деталь. Требование «< 60 с на 12 ГБ VRAM» здесь не проверяемо.
 - **Совпадение с эталоном в ai-bench — 44 %:** модель часто строит валидное, но не то тело (пропущенные отверстия, высота).
 - **qwen3:8b непригоден на CPU** (0 % под грамматикой, > 10 мин без неё) — ADR 0005.
-- **MSI не устанавливался** на эту систему (только распаковка); AppImage не собирался (нужен Linux + linuxdeploy). GitHub Actions ни разу не запускались — нет удалённого репозитория.
+- **MSI не устанавливался** на эту систему (только распаковка); AppImage не собирался (нужен Linux + linuxdeploy). GitHub Actions: первый запуск CI — после пуша 2026-10-17 (результат см. во вкладке Actions).
 - Отложено (`docs/ideas.md`): панели и события Plugin API 1.1, бейджи ограничений эскиза, толстые рёбра выбора, окно выбора рамкой, анимации камеры, жест marking menu, Slice, минимальное расстояние между произвольными гранями.
 
 ### ai-bench (50 кейсов, CPU, `docs/bench/`)
@@ -183,7 +183,7 @@
 ## Требует человека
 - **WiX 7** требует принять OSMF EULA (`wix eula accept wix7`); сборка MSI переведена на WiX 5.0.2 (`dotnet tool install --global wix --version 5.0.2`), так что это не обязательно. Лицензию за вас не принимал.
 - **Установка MSI** на эту машину не выполнялась (меняет профиль пользователя) — проверьте вручную: `msiexec /i dist\FormCraft-0.1.0-x64.msi`.
-- **GitHub:** создать репозиторий и запушить (`git remote add origin …; git push -u origin main --tags`), чтобы заработал CI в `.github/workflows/ci.yml`. Публиковать без разрешения не стал.
+- **GitHub:** приватный репозиторий https://github.com/xSUSASos/formcraft создан и запушен 2026-10-17 (main + теги phase-0…phase-7); CI в `.github/workflows/ci.yml` запускается на push, `release.yml` — на теги `v*`/`phase-7`.
 - Прокси/VPN в fake-IP режиме ломает `ollama pull` (CDN → 198.18.x). Модели качаются вручную с Hugging Face (`docs/environment.md`). Чтобы `ollama pull` заработал: исключить `registry.ollama.ai` и `*.r2.cloudflarestorage.com` из fake-IP.
 - Ollama 0.40.4 не находит RTX 4050 (`initial_count=0`), инференс на CPU (~14 с на короткий ответ 7B). Проверить: настройки графики Windows → «Высокая производительность» для `ollama.exe`, либо обновить Ollama. Драйверы не трогали.
 - qwen3-8b GGUF: докачка скриптом `C:/fc-models/dl.sh` (запуск: `bash /c/fc-models/dl.sh`), затем `ollama create qwen3:8b -f C:/fc-models/qwen3-8b.Modelfile`.
