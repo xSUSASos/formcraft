@@ -10,6 +10,7 @@ use egui::{RichText, Ui};
 use formcraft_engine::Session;
 use formcraft_plugin::Plugins;
 
+use crate::i18n::tr;
 use crate::theme::{SIZE, Tokens};
 
 #[derive(Default, PartialEq, Clone, Copy)]
@@ -146,7 +147,7 @@ impl AddIns {
             return action;
         }
         let mut open = true;
-        egui::Window::new("Scripts and Add-Ins")
+        egui::Window::new(tr("Scripts and Add-Ins"))
             .id(egui::Id::new("addins"))
             .frame(crate::theme::card(t))
             .default_width(SIZE.assistant_w * 1.6)
@@ -155,8 +156,8 @@ impl AddIns {
             .open(&mut open)
             .show(ui.ctx(), |ui| {
                 ui.horizontal(|ui| {
-                    ui.selectable_value(&mut self.tab, Tab::AddIns, "ADD-INS");
-                    ui.selectable_value(&mut self.tab, Tab::Scripts, "SCRIPTS");
+                    ui.selectable_value(&mut self.tab, Tab::AddIns, tr("ADD-INS"));
+                    ui.selectable_value(&mut self.tab, Tab::Scripts, tr("SCRIPTS"));
                 });
                 ui.separator();
                 match self.tab {
@@ -176,7 +177,7 @@ impl AddIns {
         let mut action = AddInAction::None;
         let list = self.plugins.as_ref().map(|p| p.list()).unwrap_or_default();
         if list.is_empty() {
-            ui.label(RichText::new("No add-ins installed.").color(t.text_secondary));
+            ui.label(RichText::new(tr("No add-ins installed.")).color(t.text_secondary));
         }
         egui::ScrollArea::vertical().max_height(SIZE.assistant_w).show(ui, |ui| {
             for p in &list {
@@ -188,13 +189,13 @@ impl AddIns {
                     ui.label(RichText::new(format!("{} {}", m.name, m.version)).strong());
                     ui.label(RichText::new(&m.id).color(t.text_secondary));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if !dead && ui.button("Unload").clicked() {
+                        if !dead && ui.button(tr("Unload")).clicked() {
                             action = AddInAction::Unload(m.id.clone());
                         }
-                        if ui.button("Reload").clicked() {
+                        if ui.button(tr("Reload")).clicked() {
                             action = AddInAction::Reload(p.dir.clone());
                         }
-                        if ui.button("Log").clicked() {
+                        if ui.button(tr("Log")).clicked() {
                             self.expanded_log =
                                 if self.expanded_log.as_deref() == Some(&m.id) { None } else { Some(m.id.clone()) };
                         }
@@ -207,27 +208,29 @@ impl AddIns {
                 let cmds: Vec<String> =
                     reg.commands.iter().cloned().chain(reg.features.iter().map(|k| format!("{}.{k}", m.id))).collect();
                 if !cmds.is_empty() {
-                    ui.label(RichText::new(format!("Commands: {}", cmds.join(", "))).size(SIZE.font_group + 1.0));
+                    ui.label(
+                        RichText::new(format!("{} {}", tr("Commands:"), cmds.join(", "))).size(SIZE.font_group + 1.0),
+                    );
                 }
                 if let Some(f) = p.failure.lock().ok().and_then(|f| f.clone()) {
-                    ui.label(RichText::new(format!("Unloaded: {f}")).color(t.error));
+                    ui.label(RichText::new(format!("{} {f}", tr("Unloaded:"))).color(t.error));
                 }
                 if self.expanded_log.as_deref() == Some(&m.id) {
                     let log = p.log().join("\n");
-                    ui.label(RichText::new(if log.is_empty() { "(empty log)".into() } else { log }).monospace());
+                    ui.label(RichText::new(if log.is_empty() { tr("(empty log)").into() } else { log }).monospace());
                 }
                 ui.add_space(SIZE.grid * 2.0);
             }
         });
         ui.separator();
         ui.horizontal(|ui| {
-            if ui.button("Install from .zip…").clicked()
+            if ui.button(tr("Install from .zip…")).clicked()
                 && let Some(zip) = rfd::FileDialog::new().add_filter("FormCraft add-in", &["zip"]).pick_file()
             {
                 action = AddInAction::Install(zip);
             }
             if let Some(dir) = &self.plugins_dir
-                && ui.button("Open folder").clicked()
+                && ui.button(tr("Open folder")).clicked()
             {
                 let _ = std::fs::create_dir_all(dir);
                 open_folder(dir);
@@ -240,26 +243,26 @@ impl AddIns {
         let mut action = AddInAction::None;
         let scripts = self.scripts();
         if scripts.is_empty() {
-            ui.label(RichText::new("No scripts. Put .py files into the scripts folder.").color(t.text_secondary));
+            ui.label(RichText::new(tr("No scripts. Put .py files into the scripts folder.")).color(t.text_secondary));
         }
         for s in &scripts {
             ui.horizontal(|ui| {
                 ui.label(s.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default());
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.add_enabled(!self.running(), egui::Button::new("Run")).clicked() {
+                    if ui.add_enabled(!self.running(), egui::Button::new(tr("Run"))).clicked() {
                         action = AddInAction::RunScript(s.clone());
                     }
                 });
             });
         }
         ui.horizontal(|ui| {
-            if ui.button("Run file…").clicked()
+            if ui.button(tr("Run file…")).clicked()
                 && let Some(f) = rfd::FileDialog::new().add_filter("Python", &["py"]).pick_file()
             {
                 action = AddInAction::RunScript(f);
             }
             if let Some(dir) = self.plugins_dir.as_ref().and_then(|p| p.parent()).map(|c| c.join("scripts"))
-                && ui.button("Open folder").clicked()
+                && ui.button(tr("Open folder")).clicked()
             {
                 let _ = std::fs::create_dir_all(&dir);
                 open_folder(&dir);

@@ -6,6 +6,7 @@
 use egui::{Pos2, Rect, Sense, Ui, Vec2};
 use formcraft_engine::{CommandSpec, Registry};
 
+use crate::i18n::{command_label, tr};
 use crate::icons;
 use crate::theme::{SIZE, Tokens};
 
@@ -155,7 +156,7 @@ pub fn tabs(ui: &mut Ui, t: &Tokens, active: &mut String, sketch_mode: bool) {
                 (true, _) => t.accent,
                 _ => t.toolbar_fg,
             };
-            let text = egui::RichText::new(tab.to_uppercase())
+            let text = egui::RichText::new(tr(tab).to_uppercase())
                 .size(SIZE.font_toolbar)
                 .extra_letter_spacing(SIZE.group_letter_spacing)
                 .color(color);
@@ -208,7 +209,7 @@ pub fn groups_ui(ui: &mut Ui, t: &Tokens, reg: &Registry, tab: &str) -> Option<A
                         }
                     }
                 });
-                let title = egui::RichText::new(format!("{}   ", g.name.to_uppercase()))
+                let title = egui::RichText::new(format!("{}   ", tr(g.name).to_uppercase()))
                     .size(SIZE.font_group)
                     .extra_letter_spacing(SIZE.group_letter_spacing)
                     .color(t.group_label);
@@ -221,7 +222,14 @@ pub fn groups_ui(ui: &mut Ui, t: &Tokens, reg: &Registry, tab: &str) -> Option<A
                 icons::paint(ui.painter(), tri, "dropdown", t.group_label, t);
                 egui::Popup::menu(&r).show(|ui| {
                     for &(id, label, icon, _) in g.items {
-                        if menu_item(ui, t, label, icon, enabled(reg, id), shortcut_of(reg, id).as_deref()) {
+                        if menu_item(
+                            ui,
+                            t,
+                            command_label(id, label),
+                            icon,
+                            enabled(reg, id),
+                            shortcut_of(reg, id).as_deref(),
+                        ) {
                             action = Some(Action::Run(id.into()));
                         }
                     }
@@ -248,6 +256,7 @@ fn icon_button(
     on: bool,
     shortcut: Option<String>,
 ) -> Option<Action> {
+    let label = command_label(id, label);
     let g = SIZE.grid;
     let font = egui::FontId::proportional(SIZE.font_toolbar);
     let caption = ui.painter().layout_no_wrap(label.to_string(), font, t.toolbar_fg);
@@ -276,7 +285,7 @@ fn icon_button(
         tip.push_str(&format!("  ({s})"));
     }
     if !on {
-        tip.push_str("\nNot available yet");
+        tip.push_str(&format!("\n{}", tr("Not available yet")));
     }
     let resp = resp.on_hover_text(tip);
     (on && resp.clicked()).then(|| Action::Run(id.into()))

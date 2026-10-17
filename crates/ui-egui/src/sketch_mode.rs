@@ -11,6 +11,7 @@ use formcraft_render::camera::Camera;
 use formcraft_sketch::{DimKind, Eid, Entity, Sketch};
 use serde_json::{Value, json};
 
+use crate::i18n::tr;
 use crate::theme::{SIZE, Tokens};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -481,7 +482,7 @@ impl SketchMode {
         egui::Area::new(Id::new("dim_input")).fixed_pos(pos + Vec2::new(12.0, -12.0)).show(ui.ctx(), |ui| {
             egui::Frame::popup(ui.style()).show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("Dimension").color(t.text_secondary));
+                    ui.label(RichText::new(tr("Dimension")).color(t.text_secondary));
                     let r = ui.add(egui::TextEdit::singleline(&mut text).desired_width(90.0));
                     r.request_focus();
                     if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
@@ -672,7 +673,7 @@ impl SketchMode {
         let section = |ui: &mut Ui, title: &str| {
             ui.add_space(g);
             ui.label(
-                RichText::new(title.to_uppercase())
+                RichText::new(tr(title).to_uppercase())
                     .size(SIZE.font_group)
                     .extra_letter_spacing(SIZE.group_letter_spacing)
                     .color(t.group_label),
@@ -682,14 +683,15 @@ impl SketchMode {
         let r = ui.cursor();
         ui.painter().hline(r.x_range(), r.top(), egui::Stroke::new(1.0, t.divider));
         section(ui, "Options");
-        if ui.button("Look At").on_hover_text("Look straight at the sketch plane").clicked() {
+        if ui.button(tr("Look At")).on_hover_text(tr("Look straight at the sketch plane")).clicked() {
             req = Request::LookAt;
         }
-        ui.checkbox(&mut self.snap, "Snap");
-        ui.add_enabled(false, egui::Checkbox::new(&mut self.show_constraints, "Show Constraints"))
-            .on_disabled_hover_text("Constraint badges are not drawn yet");
-        ui.checkbox(&mut self.show_dimensions, "Show Dimensions");
-        ui.add_enabled(false, egui::Checkbox::new(&mut false, "Slice")).on_disabled_hover_text("Not available yet");
+        ui.checkbox(&mut self.snap, tr("Snap"));
+        ui.add_enabled(false, egui::Checkbox::new(&mut self.show_constraints, tr("Show Constraints")))
+            .on_disabled_hover_text(tr("Constraint badges are not drawn yet"));
+        ui.checkbox(&mut self.show_dimensions, tr("Show Dimensions"));
+        ui.add_enabled(false, egui::Checkbox::new(&mut false, tr("Slice")))
+            .on_disabled_hover_text(tr("Not available yet"));
         section(ui, "Tools");
         let cell = (SIZE.palette_w - g * 4.0) / 6.0;
         ui.horizontal(|ui| {
@@ -704,7 +706,7 @@ impl SketchMode {
                     Tool::Dimension => "dimension",
                 };
                 let on = self.tool == tool;
-                if crate::icons::button(ui, t, icon, tool.label(), cell, true, on).clicked() {
+                if crate::icons::button(ui, t, icon, tr(tool.label()), cell, true, on).clicked() {
                     self.set_tool(tool);
                 }
             }
@@ -773,7 +775,11 @@ impl SketchMode {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 0.0;
                 for (label, icon, ok, constraint) in row {
-                    let tip = if *ok { label.to_string() } else { format!("{label}: select suitable geometry first") };
+                    let tip = if *ok {
+                        tr(label).to_string()
+                    } else {
+                        format!("{}: {}", tr(label), tr("select suitable geometry first"))
+                    };
                     if crate::icons::button(ui, t, icon, &tip, cell, *ok, false).clicked()
                         && let Some(c) = constraint
                     {
@@ -784,15 +790,15 @@ impl SketchMode {
         }
         ui.add_space(g);
         match dof {
-            Some(0) => ui.label(RichText::new("Fully constrained").color(t.ok)),
-            Some(n) => ui.label(format!("{n} degrees of freedom")),
-            None => ui.label(RichText::new("Sketch failed").color(t.error)),
+            Some(0) => ui.label(RichText::new(tr("Fully constrained")).color(t.ok)),
+            Some(n) => ui.label(format!("{n} {}", tr("degrees of freedom"))),
+            None => ui.label(RichText::new(tr("Sketch failed")).color(t.error)),
         };
         if let Some(m) = &self.message {
-            ui.label(RichText::new(m).color(t.warning));
+            ui.label(RichText::new(tr(m)).color(t.warning));
         }
         ui.add_space(g * 2.0);
-        let finish = egui::Button::new(RichText::new("FINISH SKETCH").strong().color(Color32::WHITE))
+        let finish = egui::Button::new(RichText::new(tr("FINISH SKETCH")).strong().color(Color32::WHITE))
             .fill(t.ok)
             .corner_radius(egui::CornerRadius::same(SIZE.radius_button))
             .min_size(Vec2::new(SIZE.palette_w - g * 4.0, SIZE.input_h + g));

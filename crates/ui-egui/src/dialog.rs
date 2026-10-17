@@ -7,6 +7,7 @@ use formcraft_engine::doc::FeatureId;
 use formcraft_engine::{Pick, Session};
 use serde_json::{Map, Value, json};
 
+use crate::i18n::{command_label, tr};
 use crate::icons;
 use crate::theme::{SIZE, Tokens};
 
@@ -282,17 +283,22 @@ impl FeatureDialog {
         ui.horizontal(|ui| {
             let (r, _) = ui.allocate_exact_size(Vec2::splat(SIZE.icon_menu + g), Sense::hover());
             icons::paint(ui.painter(), r, &icon, t.icon_outline, t);
+            let label = spec
+                .as_ref()
+                .map(|c| command_label(&self.command, &c.label).to_string())
+                .unwrap_or_else(|| self.title.clone());
+            let title = if self.editing.is_some() { format!("{} {label}", tr("Edit")) } else { label };
             ui.label(
-                RichText::new(self.title.to_uppercase())
+                RichText::new(title.to_uppercase())
                     .font(crate::theme::heading(ui.ctx()))
                     .extra_letter_spacing(SIZE.group_letter_spacing)
                     .color(t.text_primary),
             );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if icons::button(ui, t, "close", "Cancel (Esc)", SIZE.icon_menu + g, true, false).clicked() {
+                if icons::button(ui, t, "close", tr("Cancel (Esc)"), SIZE.icon_menu + g, true, false).clicked() {
                     outcome = Outcome::Cancel;
                 }
-                if icons::button(ui, t, "help", "Help", SIZE.icon_menu + g, true, false)
+                if icons::button(ui, t, "help", tr("Help"), SIZE.icon_menu + g, true, false)
                     .on_hover_text(&description)
                     .clicked()
                 {
@@ -310,7 +316,7 @@ impl FeatureDialog {
                 let (lr, lresp) = ui.allocate_exact_size(Vec2::new(SIZE.dialog_label_w, SIZE.input_h), Sense::hover());
                 let font = egui::FontId::proportional(SIZE.font_panel);
                 let color = if f.required { t.text_primary } else { t.text_secondary };
-                ui.painter().text(lr.left_center(), egui::Align2::LEFT_CENTER, &f.label, font, color);
+                ui.painter().text(lr.left_center(), egui::Align2::LEFT_CENTER, tr(&f.label), font, color);
                 if !f.help.is_empty() {
                     lresp.on_hover_text(&f.help);
                 }
@@ -328,7 +334,7 @@ impl FeatureDialog {
                         });
                     }
                     Kind::Choice(opts) => {
-                        let shown = pretty(&f.text);
+                        let shown = tr(&pretty(&f.text)).to_string();
                         egui::ComboBox::from_id_salt(("choice", i)).width(control_w).selected_text(shown).show_ui(
                             ui,
                             |ui| {
@@ -339,7 +345,7 @@ impl FeatureDialog {
                                                 .allocate_exact_size(Vec2::splat(SIZE.icon_menu / 1.5), Sense::hover());
                                             ui.painter().rect_filled(r, CornerRadius::same(SIZE.radius_input), c);
                                         }
-                                        ui.selectable_value(&mut f.text, o.clone(), pretty(o));
+                                        ui.selectable_value(&mut f.text, o.clone(), tr(&pretty(o)));
                                     });
                                 }
                             },
@@ -355,14 +361,14 @@ impl FeatureDialog {
                     }
                     Kind::Body | Kind::Sketch => {
                         let list = if f.kind == Kind::Body { &bodies } else { &sketches };
-                        let fallback = if f.text.is_empty() { "(default)".to_string() } else { f.text.clone() };
+                        let fallback = if f.text.is_empty() { tr("(default)").to_string() } else { f.text.clone() };
                         let found = list.iter().find(|(id, _)| *id == f.text).map(|(_, n)| n.clone());
                         let shown = found.unwrap_or(fallback);
                         egui::ComboBox::from_id_salt(("pick", i)).width(control_w).selected_text(shown).show_ui(
                             ui,
                             |ui| {
                                 if !f.required {
-                                    ui.selectable_value(&mut f.text, String::new(), "(default)");
+                                    ui.selectable_value(&mut f.text, String::new(), tr("(default)"));
                                 }
                                 for (id, name) in list {
                                     ui.selectable_value(&mut f.text, id.clone(), name);
@@ -376,10 +382,10 @@ impl FeatureDialog {
                             ui.spacing_mut().item_spacing.x = g;
                             let picked = !f.text.is_empty();
                             let stroke = egui::Stroke::new(1.0, if picked { t.accent } else { t.divider });
-                            let b = egui::Button::new(RichText::new("Select").size(SIZE.font_panel))
+                            let b = egui::Button::new(RichText::new(tr("Select")).size(SIZE.font_panel))
                                 .stroke(stroke)
                                 .corner_radius(CornerRadius::same(SIZE.radius_input));
-                            if ui.add(b).on_hover_text("Use the faces/edges selected on the canvas").clicked() {
+                            if ui.add(b).on_hover_text(tr("Use the faces/edges selected on the canvas")).clicked() {
                                 use_sel = Some(i);
                             }
                             let mut shown = if f.text.starts_with('{') || f.text.starts_with('[') {
@@ -387,7 +393,7 @@ impl FeatureDialog {
                             } else {
                                 f.text.clone()
                             };
-                            let hint = if f.kind == Kind::Faces { "e.g. top" } else { "e.g. vertical" };
+                            let hint = tr(if f.kind == Kind::Faces { "e.g. top" } else { "e.g. vertical" });
                             let r = ui.add(
                                 egui::TextEdit::singleline(&mut shown)
                                     .desired_width(control_w - g * 22.0)
@@ -396,7 +402,9 @@ impl FeatureDialog {
                             if r.changed() {
                                 f.text = shown;
                             }
-                            if picked && icons::button(ui, t, "close", "Clear", SIZE.icon_menu, true, false).clicked() {
+                            if picked
+                                && icons::button(ui, t, "close", tr("Clear"), SIZE.icon_menu, true, false).clicked()
+                            {
                                 f.text.clear();
                             }
                         });
@@ -407,7 +415,7 @@ impl FeatureDialog {
                             let w = if unit.is_empty() { control_w } else { control_w - g * 8.0 };
                             ui.add(egui::TextEdit::singleline(&mut f.text).desired_width(w));
                             if !unit.is_empty() {
-                                ui.label(RichText::new(unit).color(t.text_secondary));
+                                ui.label(RichText::new(tr(unit)).color(t.text_secondary));
                             }
                         });
                     }
@@ -431,7 +439,7 @@ impl FeatureDialog {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let size = Vec2::new(g * 18.0, SIZE.input_h + g);
             let radius = CornerRadius::same(SIZE.radius_button);
-            let cancel = egui::Button::new(RichText::new("Cancel").color(t.text_primary))
+            let cancel = egui::Button::new(RichText::new(tr("Cancel")).color(t.text_primary))
                 .fill(Color32::TRANSPARENT)
                 .stroke(egui::Stroke::new(1.0, t.divider))
                 .corner_radius(radius)
@@ -439,11 +447,11 @@ impl FeatureDialog {
             if ui.add(cancel).clicked() {
                 outcome = Outcome::Cancel;
             }
-            let ok = egui::Button::new(RichText::new("OK").strong().color(Color32::WHITE))
+            let ok = egui::Button::new(RichText::new(tr("OK")).strong().color(Color32::WHITE))
                 .fill(t.accent)
                 .corner_radius(radius)
                 .min_size(size);
-            if ui.add(ok).on_hover_text("OK (Enter)").clicked() {
+            if ui.add(ok).on_hover_text(tr("OK (Enter)")).clicked() {
                 outcome = Outcome::Ok;
             }
         });
@@ -492,8 +500,8 @@ fn unit_of(key: &str, kind: &Kind) -> &'static str {
 
 fn selection_count(text: &str) -> String {
     match serde_json::from_str::<Value>(text) {
-        Ok(Value::Array(a)) => format!("{} selected", a.len()),
-        Ok(_) => "1 selected".into(),
+        Ok(Value::Array(a)) => format!("{} {}", a.len(), tr("selected")),
+        Ok(_) => format!("1 {}", tr("selected")),
         Err(_) => text.to_string(),
     }
 }

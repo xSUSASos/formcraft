@@ -5,6 +5,7 @@ use egui::{Align2, Color32, CornerRadius, FontId, Id, Pos2, Rect, RichText, Sens
 use formcraft_engine::{CommandSpec, Session};
 use serde_json::{Value, json};
 
+use crate::i18n::{command_label, tr};
 use crate::icons;
 use crate::theme::{SIZE, Tokens};
 
@@ -31,7 +32,7 @@ pub enum MenuAction {
 
 fn label_for(s: &Session, id: &str) -> Option<(String, String)> {
     let spec = s.registry().get(id)?;
-    Some((spec.spec.label.clone(), spec.spec.icon.clone().unwrap_or_else(|| "plugin".into())))
+    Some((command_label(id, &spec.spec.label).to_string(), spec.spec.icon.clone().unwrap_or_else(|| "plugin".into())))
 }
 
 /// Sector index under `p` (0 = top, clockwise), `None` inside the centre circle.
@@ -98,17 +99,17 @@ pub fn marking_menu(ui: &mut Ui, t: &Tokens, s: &Session, at: Pos2, last: Option
                     Align2::CENTER_TOP
                 };
                 let galley = p.layout_no_wrap(label, font.clone(), if on { Color32::WHITE } else { t.text_primary });
-                let tr = align.anchor_size(anchor, galley.size()).expand2(Vec2::new(SIZE.grid * 2.0, SIZE.grid));
-                p.rect_filled(tr, CornerRadius::same(SIZE.radius_card), if on { t.accent } else { t.panel_bg });
+                let tag = align.anchor_size(anchor, galley.size()).expand2(Vec2::new(SIZE.grid * 2.0, SIZE.grid));
+                p.rect_filled(tag, CornerRadius::same(SIZE.radius_card), if on { t.accent } else { t.panel_bg });
                 p.rect_stroke(
-                    tr,
+                    tag,
                     CornerRadius::same(SIZE.radius_card),
                     Stroke::new(1.0, t.divider),
                     egui::StrokeKind::Inside,
                 );
-                p.galley(tr.min + Vec2::new(SIZE.grid * 2.0, SIZE.grid), galley, t.text_primary);
+                p.galley(tag.min + Vec2::new(SIZE.grid * 2.0, SIZE.grid), galley, t.text_primary);
                 let clicked_ring = on && ui.input(|i| i.pointer.primary_clicked());
-                let clicked_label = ui.interact(tr, Id::new(("mm", k)), Sense::click()).clicked();
+                let clicked_label = ui.interact(tag, Id::new(("mm", k)), Sense::click()).clicked();
                 if clicked_ring || clicked_label {
                     out = Some(MenuAction::Run(id.to_string()));
                 }
@@ -127,7 +128,8 @@ pub fn marking_menu(ui: &mut Ui, t: &Tokens, s: &Session, at: Pos2, last: Option
                 Some(spec) => {
                     let icon = spec.icon.clone().unwrap_or_else(|| "plugin".into());
                     icons::paint(p, Rect::from_center_size(c, Vec2::splat(SIZE.icon_nav)), &icon, t.icon_outline, t);
-                    if cr.on_hover_text(format!("Repeat {}", spec.label)).clicked() {
+                    if cr.on_hover_text(format!("{} {}", tr("Repeat"), command_label(&spec.id, &spec.label))).clicked()
+                    {
                         out = Some(MenuAction::Run(spec.id.clone()));
                     }
                 }
@@ -145,13 +147,13 @@ pub fn marking_menu(ui: &mut Ui, t: &Tokens, s: &Session, at: Pos2, last: Option
                 if s.registry().get("ai.generate").is_some() {
                     rows.push((
                         "ai.generate".into(),
-                        "Edit with AI…".into(),
+                        tr("Edit with AI…").into(),
                         "ai".into(),
                         Some(json!({"use_selection": true})),
                     ));
                 }
                 if s.registry().get("sketch.create").is_some() {
-                    rows.push(("sketch.create".into(), "Create Sketch on Face".into(), "sketch".into(), None));
+                    rows.push(("sketch.create".into(), tr("Create Sketch on Face").into(), "sketch".into(), None));
                 }
             }
             for id in LIST {
@@ -225,10 +227,10 @@ pub struct Hit {
 fn hit(c: &CommandSpec) -> Hit {
     Hit {
         id: c.id.clone(),
-        label: c.label.clone(),
+        label: command_label(&c.id, &c.label).to_string(),
         icon: c.icon.clone().unwrap_or_else(|| "plugin".into()),
         shortcut: c.shortcut.clone(),
-        path: c.placement.as_ref().map(|p| format!("{} › {}", p.tab, p.group)).unwrap_or_default(),
+        path: c.placement.as_ref().map(|p| format!("{} › {}", tr(&p.tab), tr(&p.group))).unwrap_or_default(),
     }
 }
 
@@ -264,7 +266,8 @@ pub fn shortcut_box(
     egui::Area::new(Id::new("shortcut_box")).fixed_pos(at).order(egui::Order::Foreground).show(ui.ctx(), |ui| {
         crate::theme::card(t).show(ui, |ui| {
             ui.set_width(SIZE.sbox_w - g * 4.0);
-            let r = ui.add(egui::TextEdit::singleline(text).hint_text("Search commands…").desired_width(f32::INFINITY));
+            let r =
+                ui.add(egui::TextEdit::singleline(text).hint_text(tr("Search commands…")).desired_width(f32::INFINITY));
             r.request_focus();
             ui.add_space(g);
             let hits = search(s, text);
@@ -289,7 +292,7 @@ pub fn shortcut_box(
                                 t.icon_outline,
                                 t,
                             );
-                            if resp.on_hover_text(&spec.label).clicked() {
+                            if resp.on_hover_text(command_label(id, &spec.label)).clicked() {
                                 out = Some(BoxAction::Run(id.clone()));
                             }
                         }
@@ -333,7 +336,7 @@ pub fn shortcut_box(
                         p.circle_filled(pin.center(), g * 0.75, t.accent);
                     }
                 }
-                if pr.on_hover_text(if pinned { "Unpin" } else { "Pin to favourites" }).clicked() {
+                if pr.on_hover_text(if pinned { tr("Unpin") } else { tr("Pin to favourites") }).clicked() {
                     toggle_pin = Some(h.id.clone());
                 } else if resp.clicked() {
                     out = Some(BoxAction::Run(h.id.clone()));
@@ -368,7 +371,7 @@ pub fn shortcut_box(
                 ui.painter().text(
                     rr.left_center() + Vec2::new(g * 7.0, 0.0),
                     Align2::LEFT_CENTER,
-                    format!("Сделать с ИИ: «{}»", text.trim()),
+                    format!("{}: «{}»", tr("Do it with AI"), text.trim()),
                     FontId::proportional(SIZE.font_panel),
                     t.ai,
                 );
@@ -377,7 +380,7 @@ pub fn shortcut_box(
                 }
             }
             if hits.is_empty() && !ai && !text.trim().is_empty() {
-                ui.label(RichText::new("No matching command").color(t.text_secondary));
+                ui.label(RichText::new(tr("No matching command")).color(t.text_secondary));
             }
             if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                 out = Some(match hits.first() {
@@ -406,59 +409,62 @@ pub struct ParamRow {
 
 pub fn parameters_window(ui: &mut Ui, t: &Tokens, rows: &mut Vec<ParamRow>, open: &mut bool) -> Vec<(String, Value)> {
     let mut cmds = Vec::new();
-    egui::Window::new("Parameters").id(Id::new("parameters")).open(open).default_width(520.0).show(ui.ctx(), |ui| {
-        egui::Grid::new("param_grid").num_columns(5).striped(true).spacing([10.0, 4.0]).show(ui, |ui| {
-            for h in ["Name", "Expression", "Value", "Comment", ""] {
-                ui.label(RichText::new(h).strong());
-            }
-            ui.end_row();
-            let mut delete = None;
-            for (i, r) in rows.iter_mut().enumerate() {
-                if r.existing {
-                    ui.label(&r.name);
-                } else {
-                    ui.add(egui::TextEdit::singleline(&mut r.name).desired_width(110.0).hint_text("name"));
-                }
-                let e = ui.add(egui::TextEdit::singleline(&mut r.expr).desired_width(130.0));
-                ui.label(r.value.map(|v| format!("{v:.4}")).unwrap_or_else(|| "—".into()));
-                let c = ui.add(egui::TextEdit::singleline(&mut r.comment).desired_width(140.0));
-                if ui.small_button("x").on_hover_text("Delete").clicked() {
-                    delete = Some(i);
-                }
-                if (e.lost_focus() || c.lost_focus()) && !r.name.trim().is_empty() && !r.expr.trim().is_empty() {
-                    cmds.push((
-                        "doc.parameter".to_string(),
-                        json!({"name": r.name.trim(), "expression": r.expr.trim(), "comment": r.comment}),
-                    ));
+    egui::Window::new(tr("Parameters")).id(Id::new("parameters")).open(open).default_width(520.0).show(
+        ui.ctx(),
+        |ui| {
+            egui::Grid::new("param_grid").num_columns(5).striped(true).spacing([10.0, 4.0]).show(ui, |ui| {
+                for h in ["Name", "Expression", "Value", "Comment", ""] {
+                    ui.label(RichText::new(tr(h)).strong());
                 }
                 ui.end_row();
-            }
-            if let Some(i) = delete
-                && let Some(r) = rows.get(i)
-            {
-                if r.existing {
-                    cmds.push(("doc.delete_parameter".to_string(), json!({"name": r.name})));
-                } else {
-                    rows.remove(i);
+                let mut delete = None;
+                for (i, r) in rows.iter_mut().enumerate() {
+                    if r.existing {
+                        ui.label(&r.name);
+                    } else {
+                        ui.add(egui::TextEdit::singleline(&mut r.name).desired_width(110.0).hint_text(tr("name")));
+                    }
+                    let e = ui.add(egui::TextEdit::singleline(&mut r.expr).desired_width(130.0));
+                    ui.label(r.value.map(|v| format!("{v:.4}")).unwrap_or_else(|| "—".into()));
+                    let c = ui.add(egui::TextEdit::singleline(&mut r.comment).desired_width(140.0));
+                    if ui.small_button("x").on_hover_text(tr("Delete")).clicked() {
+                        delete = Some(i);
+                    }
+                    if (e.lost_focus() || c.lost_focus()) && !r.name.trim().is_empty() && !r.expr.trim().is_empty() {
+                        cmds.push((
+                            "doc.parameter".to_string(),
+                            json!({"name": r.name.trim(), "expression": r.expr.trim(), "comment": r.comment}),
+                        ));
+                    }
+                    ui.end_row();
                 }
-            }
-        });
-        ui.add_space(6.0);
-        if ui.button("+ Add user parameter").clicked() {
-            rows.push(ParamRow {
-                name: String::new(),
-                expr: "0".into(),
-                comment: String::new(),
-                value: None,
-                existing: false,
+                if let Some(i) = delete
+                    && let Some(r) = rows.get(i)
+                {
+                    if r.existing {
+                        cmds.push(("doc.delete_parameter".to_string(), json!({"name": r.name})));
+                    } else {
+                        rows.remove(i);
+                    }
+                }
             });
-        }
-        ui.label(
-            RichText::new("Expressions may use other parameters, units (mm, cm, in, deg) and functions.")
-                .color(t.text_secondary)
-                .size(11.0),
-        );
-    });
+            ui.add_space(6.0);
+            if ui.button(tr("+ Add user parameter")).clicked() {
+                rows.push(ParamRow {
+                    name: String::new(),
+                    expr: "0".into(),
+                    comment: String::new(),
+                    value: None,
+                    existing: false,
+                });
+            }
+            ui.label(
+                RichText::new(tr("Expressions may use other parameters, units (mm, cm, in, deg) and functions."))
+                    .color(t.text_secondary)
+                    .size(11.0),
+            );
+        },
+    );
     cmds
 }
 

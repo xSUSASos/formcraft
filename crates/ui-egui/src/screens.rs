@@ -41,6 +41,16 @@ fn run_steps(app: &mut FormCraftApp, steps: &[(&str, &str)]) -> Result<(), Strin
     Ok(())
 }
 
+/// The layout for the scenes; `FORMCRAFT_LANG=ru` renders the Russian interface.
+fn scene_layout() -> Layout {
+    let mut l = Layout::default();
+    if std::env::var("FORMCRAFT_LANG").is_ok_and(|v| v.eq_ignore_ascii_case("ru")) {
+        l.settings.language = crate::i18n::Lang::Ru;
+        crate::i18n::set(crate::i18n::Lang::Ru);
+    }
+    l
+}
+
 fn options(scene: &str, theme: ThemeKind) -> AppOptions {
     let mut o = AppOptions { theme: Some(theme), fresh_layout: true, ..AppOptions::default() };
     match scene {
@@ -101,12 +111,8 @@ pub fn render(scene: &str, theme: ThemeKind, size: [u32; 2]) -> Result<image::Rg
         _ => run_steps(&mut pre, PLATE)?,
     }
     // re-create with the scene's options on top of the prepared document
-    let mut app = FormCraftApp::with_state_and_session(
-        Layout::default(),
-        Camera::home(),
-        options(scene, theme),
-        pre.take_session(),
-    );
+    let mut app =
+        FormCraftApp::with_state_and_session(scene_layout(), Camera::home(), options(scene, theme), pre.take_session());
     if scene != "4-sketch" {
         app.fit_view();
     }

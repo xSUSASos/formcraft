@@ -12,6 +12,7 @@ use formcraft_ai::{AiError, AiRequest, Generator, Plan, Progress, Proposal};
 use formcraft_engine::Session;
 use serde_json::Value;
 
+use crate::i18n::tr;
 use crate::icons;
 use crate::theme::{SIZE, Tokens};
 
@@ -182,34 +183,36 @@ impl Assistant {
         ui.horizontal(|ui| {
             let (r, _) = ui.allocate_exact_size(Vec2::splat(SIZE.icon_menu + SIZE.grid), Sense::hover());
             icons::paint(ui.painter(), r, "ai", t.ai, t);
-            ui.label(RichText::new("ASSISTANT").font(crate::theme::heading(ui.ctx())).color(t.text_primary));
+            ui.label(RichText::new(tr("ASSISTANT")).font(crate::theme::heading(ui.ctx())).color(t.text_primary));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if icons::button(ui, t, "close", "Close", SIZE.icon_menu + SIZE.grid, true, false).clicked() {
+                if icons::button(ui, t, "close", tr("Close"), SIZE.icon_menu + SIZE.grid, true, false).clicked() {
                     *open = false;
                 }
                 // model + status dot (green: reachable, red: error, grey: unknown)
                 let (dot, text) = match (&self.status, &self.generator) {
-                    (_, None) => (t.text_disabled, "not configured".to_string()),
+                    (_, None) => (t.text_disabled, tr("not configured").to_string()),
                     (None, Some(g)) => (t.text_disabled, g.backend.model()),
                     (Some(Ok(v)), Some(g)) => {
                         let vram = v["loaded"]
                             .as_array()
                             .and_then(|a| a.first())
                             .and_then(|m| m["vram"].as_f64())
-                            .map(|b| if b > 0.0 { format!(" · {:.1} GB VRAM", b / 1e9) } else { " · CPU".into() })
+                            .map(|b| {
+                                if b > 0.0 { format!(" · {:.1} {}", b / 1e9, tr("GB VRAM")) } else { " · CPU".into() }
+                            })
                             .unwrap_or_default();
                         let ok = v["available"].as_bool().unwrap_or(true);
                         (if ok { t.ok } else { t.warning }, format!("{}{vram}", g.backend.model()))
                     }
                     (Some(Err(e)), Some(g)) => {
                         let _ = e;
-                        (t.error, format!("{} · offline", g.backend.model()))
+                        (t.error, format!("{} · {}", g.backend.model(), tr("offline")))
                     }
                 };
                 let tip = match &self.status {
                     Some(Err(e)) => e.clone(),
                     Some(Ok(v)) => v.to_string(),
-                    None => "status not checked yet".into(),
+                    None => tr("status not checked yet").into(),
                 };
                 let (r, resp) = ui.allocate_exact_size(Vec2::splat(SIZE.grid * 3.0), Sense::click());
                 ui.painter().circle_filled(r.center(), SIZE.grid, dot);
@@ -234,7 +237,7 @@ impl Assistant {
         egui::ScrollArea::vertical().max_height(SIZE.assistant_w).stick_to_bottom(true).show(ui, |ui| {
             if self.entries.is_empty() {
                 ui.label(
-                    RichText::new("Describe a part or a change, e.g. “flange D100, 4 holes D9 on D80, 10 thick”.")
+                    RichText::new(tr("Describe a part or a change, e.g. “flange D100, 4 holes D9 on D80, 10 thick”."))
                         .color(t.text_secondary),
                 );
             }
@@ -255,8 +258,8 @@ impl Assistant {
                         ui.painter().rect_filled(bar, CornerRadius::ZERO, t.ai);
                         ui.ctx().request_repaint();
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new(p).color(t.ai));
-                            if ui.button("Stop").clicked()
+                            ui.label(RichText::new(tr(p)).color(t.ai));
+                            if ui.button(tr("Stop")).clicked()
                                 && let Some(j) = self.job.as_ref()
                             {
                                 j.cancel.store(true, Ordering::Relaxed);
@@ -266,13 +269,13 @@ impl Assistant {
                     EntryState::Proposal(p) => {
                         proposal_ui(ui, t, &p.plan, p.attempts.len(), p.elapsed.as_secs_f64());
                         ui.horizontal(|ui| {
-                            let accept = egui::Button::new(RichText::new("Accept").strong().color(Color32::WHITE))
+                            let accept = egui::Button::new(RichText::new(tr("Accept")).strong().color(Color32::WHITE))
                                 .fill(t.ai)
                                 .corner_radius(CornerRadius::same(SIZE.radius_button));
                             if ui.add(accept).clicked() {
                                 action = AssistantAction::Accept(i);
                             }
-                            if ui.button("Reject").clicked() {
+                            if ui.button(tr("Reject")).clicked() {
                                 action = AssistantAction::Reject(i);
                             }
                         });
@@ -281,10 +284,10 @@ impl Assistant {
                         ui.label(RichText::new(format!("✓ {m}")).color(t.ok));
                     }
                     EntryState::Rejected => {
-                        ui.label(RichText::new("Rejected").color(t.text_secondary));
+                        ui.label(RichText::new(tr("Rejected")).color(t.text_secondary));
                     }
                     EntryState::Failed(m) => {
-                        ui.label(RichText::new(m).color(t.error));
+                        ui.label(RichText::new(tr(m)).color(t.error));
                     }
                     EntryState::Note(m) => {
                         ui.label(RichText::new(m).color(t.text_primary));
@@ -301,9 +304,9 @@ impl Assistant {
         let edit =
             ui.add(egui::TextEdit::multiline(&mut self.input).desired_rows(2).desired_width(f32::INFINITY).hint_text(
                 if has_sel {
-                    "Change the selection, e.g. “4 holes M5 in the corners”"
+                    tr("Change the selection, e.g. “4 holes M5 in the corners”")
                 } else {
-                    "Describe a part…"
+                    tr("Describe a part…")
                 },
             ));
         if self.focus_input {
@@ -311,10 +314,10 @@ impl Assistant {
             self.focus_input = false;
         }
         ui.horizontal(|ui| {
-            ui.add_enabled(has_sel, egui::Checkbox::new(&mut self.use_selection, "Use selection"));
+            ui.add_enabled(has_sel, egui::Checkbox::new(&mut self.use_selection, tr("Use selection")));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let ready = !self.input.trim().is_empty() && !self.busy();
-                let go = egui::Button::new(RichText::new("Generate").strong().color(Color32::WHITE))
+                let go = egui::Button::new(RichText::new(tr("Generate")).strong().color(Color32::WHITE))
                     .fill(if ready { t.ai } else { t.text_disabled })
                     .corner_radius(CornerRadius::same(SIZE.radius_button));
                 let enter = edit.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter) && !i.modifiers.shift);
@@ -364,8 +367,8 @@ fn proposal_ui(ui: &mut Ui, t: &Tokens, plan: &Plan, attempts: usize, secs: f64)
             .collect();
         ui.label(RichText::new(p.join(", ")).size(SIZE.font_group + 1.0).color(t.text_secondary));
     }
-    let extra = if attempts > 1 { format!(", {attempts} attempts") } else { String::new() };
-    ui.label(RichText::new(format!("{secs:.0} s{extra}")).size(SIZE.font_group).color(t.text_secondary));
+    let extra = if attempts > 1 { format!(", {attempts} {}", tr("attempts")) } else { String::new() };
+    ui.label(RichText::new(format!("{secs:.0} {}{extra}", tr("s"))).size(SIZE.font_group).color(t.text_secondary));
 }
 
 pub fn short(v: &Value) -> String {

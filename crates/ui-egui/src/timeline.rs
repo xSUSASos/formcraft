@@ -8,6 +8,7 @@ use formcraft_engine::Session;
 use formcraft_engine::doc::FeatureId;
 use formcraft_engine::regen::Status;
 
+use crate::i18n::tr;
 use crate::icons;
 use crate::theme::{SIZE, Tokens};
 
@@ -100,16 +101,16 @@ pub fn ui(ui: &mut Ui, t: &Tokens, s: &Session) -> Option<Action> {
         let at = marker.unwrap_or(n);
         let can_back = at > 0;
         let can_fwd = at < n;
-        if icons::button(ui, t, "tl_start", "Move to beginning", nav, can_back, false).clicked() {
+        if icons::button(ui, t, "tl_start", tr("Move to beginning"), nav, can_back, false).clicked() {
             action = Some(Action::Marker(Some(0)));
         }
-        if icons::button(ui, t, "tl_back", "Step back", nav, can_back, false).clicked() {
+        if icons::button(ui, t, "tl_back", tr("Step back"), nav, can_back, false).clicked() {
             action = Some(Action::Marker(Some(at.saturating_sub(1))));
         }
-        if icons::button(ui, t, "tl_fwd", "Step forward", nav, can_fwd, false).clicked() {
+        if icons::button(ui, t, "tl_fwd", tr("Step forward"), nav, can_fwd, false).clicked() {
             action = Some(Action::Marker(if at + 1 >= n { None } else { Some(at + 1) }));
         }
-        if icons::button(ui, t, "tl_end", "Move to end", nav, can_fwd, false).clicked() {
+        if icons::button(ui, t, "tl_end", tr("Move to end"), nav, can_fwd, false).clicked() {
             action = Some(Action::Marker(None));
         }
         let x = ui.cursor().left() + SIZE.grid;
@@ -123,14 +124,14 @@ pub fn ui(ui: &mut Ui, t: &Tokens, s: &Session) -> Option<Action> {
             ui.painter().rect_filled(gear_rect, CornerRadius::same(SIZE.radius_button), t.toolbar_hover);
         }
         icons::paint(ui.painter(), gear_rect.shrink(SIZE.grid / 2.0), "settings", t.icon_outline, t);
-        if gear.on_hover_text("Timeline settings").clicked() {
+        if gear.on_hover_text(tr("Timeline settings")).clicked() {
             action = Some(Action::Settings);
         }
         if n == 0 {
             ui.painter().text(
                 strip.left_center() + Vec2::new(SIZE.grid * 2.0, 0.0),
                 Align2::LEFT_CENTER,
-                "Timeline: no features yet",
+                tr("Timeline: no features yet"),
                 FontId::proportional(SIZE.font_panel),
                 t.text_secondary,
             );
@@ -201,8 +202,8 @@ pub fn ui(ui: &mut Ui, t: &Tokens, s: &Session) -> Option<Action> {
                     if failed {
                         ui.painter().rect_stroke(r, radius, Stroke::new(2.0, t.error), StrokeKind::Inside);
                     }
-                    let name = d.groups.get(&g).cloned().unwrap_or_else(|| "Group".into());
-                    let tip = format!("{name}\n{} features — click to expand", last + 1 - first);
+                    let name = d.groups.get(&g).cloned().unwrap_or_else(|| tr("Group").into());
+                    let tip = format!("{name}\n{} {}", last + 1 - first, tr("features — click to expand"));
                     if resp.on_hover_text(tip).clicked() {
                         ui.data_mut(|m| m.insert_temp(expanded_id(g), true));
                     }
@@ -298,10 +299,10 @@ fn feature_tile(
         ui.painter().hline(r.x_range(), r.bottom() + 1.0, Stroke::new(2.0, t.ai));
     }
     let tip = match status {
-        Some(Status::Error(e)) => format!("{}\nError: {e}", f.name),
-        Some(Status::Warning(w)) => format!("{}\nWarning: {w}", f.name),
-        Some(Status::Suppressed) => format!("{} (suppressed)", f.name),
-        Some(Status::RolledBack) => format!("{} (rolled back)", f.name),
+        Some(Status::Error(e)) => format!("{}\n{} {e}", f.name, tr("Error:")),
+        Some(Status::Warning(w)) => format!("{}\n{} {w}", f.name, tr("Warning:")),
+        Some(Status::Suppressed) => format!("{} ({})", f.name, tr("suppressed")),
+        Some(Status::RolledBack) => format!("{} ({})", f.name, tr("rolled back")),
         _ => f.name.clone(),
     };
     let resp = resp.on_hover_text(tip);
@@ -310,29 +311,29 @@ fn feature_tile(
         action = Some(Action::Edit(f.id));
     }
     resp.context_menu(|ui| {
-        if ui.button("Edit Feature").clicked() {
+        if ui.button(tr("Edit Feature")).clicked() {
             action = Some(Action::Edit(f.id));
             ui.close();
         }
-        if ui.button("Rename…").clicked() {
+        if ui.button(tr("Rename…")).clicked() {
             action = Some(Action::Rename(f.id));
             ui.close();
         }
-        let label = if f.suppressed { "Unsuppress Features" } else { "Suppress Features" };
+        let label = tr(if f.suppressed { "Unsuppress Features" } else { "Suppress Features" });
         if ui.button(label).clicked() {
             action = Some(Action::Suppress(f.id, !f.suppressed));
             ui.close();
         }
-        if ui.button("Roll History Marker Here").clicked() {
+        if ui.button(tr("Roll History Marker Here")).clicked() {
             action = Some(Action::Marker(Some(i + 1).filter(|m| *m < n)));
             ui.close();
         }
-        if ui.button("Explain").on_hover_text("Describe this feature in words").clicked() {
+        if ui.button(tr("Explain")).on_hover_text(tr("Describe this feature in words")).clicked() {
             action = Some(Action::Explain(f.id));
             ui.close();
         }
         ui.separator();
-        if ui.button("Delete").clicked() {
+        if ui.button(tr("Delete")).clicked() {
             action = Some(Action::Delete(f.id));
             ui.close();
         }

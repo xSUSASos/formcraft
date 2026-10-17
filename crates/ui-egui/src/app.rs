@@ -16,6 +16,7 @@ use serde_json::{Value, json};
 
 use crate::control;
 use crate::dialog::{FeatureDialog, Outcome};
+use crate::i18n::{command_label, tr};
 use crate::icons;
 use crate::layout::{Dock, Layout, VisualStyle};
 use crate::sketch_mode::{Request, SketchMode, Tool};
@@ -500,7 +501,7 @@ impl FormCraftApp {
         let right = self.canvas_rect.right() - SIZE.card_margin;
         let mut open = true;
         let mut action = crate::assistant::AssistantAction::None;
-        egui::Window::new("Assistant")
+        egui::Window::new(tr("Assistant"))
             .id(Id::new("assistant"))
             .title_bar(false)
             .frame(crate::theme::card(t))
@@ -882,20 +883,20 @@ impl FormCraftApp {
         });
         let mut choice: Option<Value> = None;
         let mut open = true;
-        egui::Window::new("Create Sketch")
+        egui::Window::new(tr("Create Sketch"))
             .id(Id::new("plane_picker"))
             .collapsible(false)
             .resizable(false)
             .anchor(Align2::RIGHT_TOP, Vec2::new(-12.0, 300.0))
             .open(&mut open)
             .show(ui.ctx(), |ui| {
-                ui.label("Select a plane:");
+                ui.label(tr("Select a plane:"));
                 for (name, tip) in [("XY", "Top (ground)"), ("XZ", "Front"), ("YZ", "Right")] {
-                    if ui.button(format!("{name} plane")).on_hover_text(tip).clicked() {
+                    if ui.button(format!("{name} {}", tr("plane"))).on_hover_text(tr(tip)).clicked() {
                         choice = Some(serde_json::json!(name));
                     }
                 }
-                let label = if face.is_some() { "Selected face" } else { "Selected face (select a planar face first)" };
+                let label = tr(if face.is_some() { "Selected face" } else { "Selected face (select a planar face first)" });
                 if ui.add_enabled(face.is_some(), egui::Button::new(label)).clicked()
                     && let Some((body, index)) = face
                     && let Some(b) = self.session.model().body(body)
@@ -917,7 +918,7 @@ impl FormCraftApp {
         let mut req = Request::None;
         let top = self.canvas_rect.top() + SIZE.viewcube + SIZE.card_margin * 6.0;
         let right = self.canvas_rect.right() - SIZE.card_margin;
-        egui::Window::new("Sketch Palette")
+        egui::Window::new(tr("Sketch Palette"))
             .id(Id::new("sketch_palette"))
             .title_bar(false)
             .frame(crate::theme::card(t))
@@ -1202,7 +1203,7 @@ impl FormCraftApp {
     fn rename_dialog(&mut self, ui: &mut Ui) {
         let Some((id, mut name)) = self.rename.take() else { return };
         let mut done = None;
-        egui::Window::new("Rename")
+        egui::Window::new(tr("Rename"))
             .id(Id::new("rename_dialog"))
             .collapsible(false)
             .resizable(false)
@@ -1211,10 +1212,10 @@ impl FormCraftApp {
                 let r = ui.text_edit_singleline(&mut name);
                 r.request_focus();
                 ui.horizontal(|ui| {
-                    if ui.button("OK").clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                    if ui.button(tr("OK")).clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                         done = Some(true);
                     }
-                    if ui.button("Cancel").clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                    if ui.button(tr("Cancel")).clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
                         done = Some(false);
                     }
                 });
@@ -1247,37 +1248,37 @@ impl FormCraftApp {
                         crate::theme::heading(ui.ctx()),
                         t.appbar_fg,
                     );
-                    let menu = self.appbar_button(ui, t, "menu", "File, View, Help", true);
+                    let menu = self.appbar_button(ui, t, "menu", tr("File, View, Help"), true);
                     egui::Popup::menu(&menu).show(|ui| self.main_menu(ui));
-                    if self.appbar_button(ui, t, "save", "Save (Ctrl+S)", true).clicked() {
+                    if self.appbar_button(ui, t, "save", tr("Save (Ctrl+S)"), true).clicked() {
                         self.file_action("doc.save");
                     }
                     let undo_on = self.session.can_undo();
-                    if self.appbar_button(ui, t, "undo", "Undo (Ctrl+Z)", undo_on).clicked() {
+                    if self.appbar_button(ui, t, "undo", tr("Undo (Ctrl+Z)"), undo_on).clicked() {
                         self.run("doc.undo", Value::Null);
                     }
                     let redo_on = self.session.can_redo();
-                    if self.appbar_button(ui, t, "redo", "Redo (Ctrl+Y)", redo_on).clicked() {
+                    if self.appbar_button(ui, t, "redo", tr("Redo (Ctrl+Y)"), redo_on).clicked() {
                         self.run("doc.redo", Value::Null);
                     }
                     ui.add_space(g * 4.0);
                     self.doc_tab(ui, t);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.spacing_mut().item_spacing.x = g;
-                        if self.appbar_button(ui, t, "help", "Help", true).clicked() {
+                        if self.appbar_button(ui, t, "help", tr("Help"), true).clicked() {
                             self.run("app.about", Value::Null);
                         }
-                        if self.appbar_button(ui, t, "settings", "Preferences", true).clicked() {
+                        if self.appbar_button(ui, t, "settings", tr("Preferences"), true).clicked() {
                             self.run("tools.settings", Value::Null);
                         }
-                        if self.appbar_button(ui, t, "ai", "Assistant (describe a part to build)", true).clicked() {
+                        if self.appbar_button(ui, t, "ai", tr("Assistant (describe a part to build)"), true).clicked() {
                             if self.layout.assistant.open {
                                 self.layout.assistant.open = false;
                             } else {
                                 self.open_assistant(false);
                             }
                         }
-                        if self.appbar_button(ui, t, "search", "Search commands (S)", true).clicked() {
+                        if self.appbar_button(ui, t, "search", tr("Search commands (S)"), true).clicked() {
                             self.search = Some((String::new(), self.canvas_rect.center_top() + Vec2::new(0.0, 40.0)));
                         }
                     });
@@ -1313,9 +1314,9 @@ impl FormCraftApp {
             ui.painter().circle_filled(rect.left_center() + Vec2::new(g * 1.5, 0.0), g * 0.75, t.appbar_fg);
         }
         let close = Rect::from_center_size(rect.right_center() - Vec2::new(g * 3.0, 0.0), Vec2::splat(SIZE.icon_menu));
-        let cr = ui.interact(close, Id::new("doc_tab_close"), Sense::click()).on_hover_text("Close (new design)");
+        let cr = ui.interact(close, Id::new("doc_tab_close"), Sense::click()).on_hover_text(tr("Close (new design)"));
         icons::paint(ui.painter(), close.shrink(g), "close", t.appbar_fg.gamma_multiply(0.8), t);
-        let new = self.appbar_button(ui, t, "plus", "New Design", true).clicked();
+        let new = self.appbar_button(ui, t, "plus", tr("New Design"), true).clicked();
         if cr.clicked() || new {
             // Unsaved work is never dropped by one click: the first click warns.
             if self.session.is_dirty() && !self.discard_armed {
@@ -1334,14 +1335,14 @@ impl FormCraftApp {
             [("New Design", "doc.new"), ("Open…", "doc.open"), ("Save", "doc.save"), ("Export…", "doc.export")]
         {
             let on = self.session.registry().get(id).is_some();
-            if ui.add_enabled(on, egui::Button::new(label)).clicked() {
+            if ui.add_enabled(on, egui::Button::new(tr(label))).clicked() {
                 ui.close();
                 self.file_action(id);
             }
         }
         ui.separator();
-        ui.menu_button("View", |ui| self.view_menu(ui));
-        if ui.button("About FormCraft").clicked() {
+        ui.menu_button(tr("View"), |ui| self.view_menu(ui));
+        if ui.button(tr("About FormCraft")).clicked() {
             self.run("app.about", Value::Null);
             ui.close();
         }
@@ -1392,23 +1393,23 @@ impl FormCraftApp {
 
     fn view_menu(&mut self, ui: &mut Ui) {
         let l = &mut self.layout;
-        ui.checkbox(&mut l.browser.open, "Browser");
-        ui.checkbox(&mut l.timeline.open, "Timeline");
-        ui.checkbox(&mut l.text_commands.open, "Text Commands");
-        ui.checkbox(&mut l.view_cube, "ViewCube");
-        ui.checkbox(&mut l.nav_bar, "Navigation Bar");
+        ui.checkbox(&mut l.browser.open, tr("Browser"));
+        ui.checkbox(&mut l.timeline.open, tr("Timeline"));
+        ui.checkbox(&mut l.text_commands.open, tr("Text Commands"));
+        ui.checkbox(&mut l.view_cube, tr("ViewCube"));
+        ui.checkbox(&mut l.nav_bar, tr("Navigation Bar"));
         ui.separator();
         let mut floating = l.browser.dock == Dock::Floating;
-        if ui.checkbox(&mut floating, "Float Browser").changed() {
+        if ui.checkbox(&mut floating, tr("Float Browser")).changed() {
             l.browser.dock = if floating { Dock::Floating } else { Dock::Docked };
         }
         ui.separator();
         ui.horizontal(|ui| {
-            ui.label("Theme");
-            ui.selectable_value(&mut l.theme, ThemeKind::Dark, "Dark");
-            ui.selectable_value(&mut l.theme, ThemeKind::Light, "Light");
+            ui.label(tr("Theme"));
+            ui.selectable_value(&mut l.theme, ThemeKind::Dark, tr("Dark"));
+            ui.selectable_value(&mut l.theme, ThemeKind::Light, tr("Light"));
         });
-        if ui.button("Reset Layout").clicked() {
+        if ui.button(tr("Reset Layout")).clicked() {
             l.reset();
             self.status = "Layout reset".into();
             ui.close();
@@ -1426,10 +1427,10 @@ impl FormCraftApp {
             .show(ui, |ui| {
                 ui.horizontal_centered(|ui| {
                     egui::ComboBox::from_id_salt("workspace")
-                        .selected_text(egui::RichText::new("DESIGN").size(SIZE.font_toolbar).strong())
+                        .selected_text(egui::RichText::new(tr("DESIGN")).size(SIZE.font_toolbar).strong())
                         .width(SIZE.grid * 22.0)
                         .show_ui(ui, |ui| {
-                            let _ = ui.selectable_label(true, "Design");
+                            let _ = ui.selectable_label(true, tr("Design"));
                         });
                     ui.add_space(SIZE.grid * 2.0);
                     toolbar::tabs(ui, t, &mut self.tab, sketching);
@@ -1448,7 +1449,7 @@ impl FormCraftApp {
                     action = toolbar::groups_ui(ui, t, self.session.registry(), &self.tab);
                     if sketching {
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            let text = egui::RichText::new("FINISH SKETCH")
+                            let text = egui::RichText::new(tr("FINISH SKETCH"))
                                 .size(SIZE.font_toolbar)
                                 .strong()
                                 .color(Color32::WHITE);
@@ -1456,7 +1457,7 @@ impl FormCraftApp {
                                 .fill(t.ok)
                                 .corner_radius(CornerRadius::same(SIZE.radius_button))
                                 .min_size(Vec2::new(SIZE.grid * 28.0, SIZE.icon_toolbar));
-                            if ui.add(b).on_hover_text("Finish Sketch").clicked() {
+                            if ui.add(b).on_hover_text(command_label("sketch.finish", "Finish Sketch")).clicked() {
                                 action = Some(Action::Run("sketch.finish".into()));
                             }
                         });
@@ -1476,7 +1477,7 @@ impl FormCraftApp {
         ui.horizontal(|ui| {
             let collapsed = self.layout.browser_collapsed;
             let arrow = if collapsed { "expand" } else { "dropdown" };
-            let title = egui::RichText::new("BROWSER")
+            let title = egui::RichText::new(tr("BROWSER"))
                 .size(SIZE.font_group)
                 .extra_letter_spacing(SIZE.group_letter_spacing)
                 .strong()
@@ -1488,11 +1489,12 @@ impl FormCraftApp {
                 self.layout.browser_collapsed = !collapsed;
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if icons::button(ui, t, "close", "Close", SIZE.icon_menu, true, false).clicked() {
+                if icons::button(ui, t, "close", tr("Close"), SIZE.icon_menu, true, false).clicked() {
                     self.layout.browser.open = false;
                 }
                 let dock = self.layout.browser.dock;
-                let (icon, tip) = if dock == Dock::Docked { ("float", "Float") } else { ("dock", "Pin to the canvas") };
+                let (icon, tip) =
+                    if dock == Dock::Docked { ("float", tr("Float")) } else { ("dock", tr("Pin to the canvas")) };
                 if icons::button(ui, t, icon, tip, SIZE.icon_menu, true, false).clicked() {
                     self.layout.browser.dock = if dock == Dock::Docked { Dock::Floating } else { Dock::Docked };
                 }
@@ -1504,18 +1506,18 @@ impl FormCraftApp {
         ui.separator();
         egui::ScrollArea::vertical().show(ui, |ui| {
             egui::CollapsingHeader::new(self.doc_name.clone()).default_open(true).show(ui, |ui| {
-                egui::CollapsingHeader::new("Document Settings").default_open(false).show(ui, |ui| {
-                    ui.label("Units: mm");
+                egui::CollapsingHeader::new(tr("Document Settings")).default_open(false).show(ui, |ui| {
+                    ui.label(tr("Units: mm"));
                 });
-                egui::CollapsingHeader::new("Named Views").default_open(false).show(ui, |ui| {
+                egui::CollapsingHeader::new(tr("Named Views")).default_open(false).show(ui, |ui| {
                     for v in ["TOP", "FRONT", "RIGHT", "HOME"] {
-                        if ui.selectable_label(false, v).clicked() {
+                        if ui.selectable_label(false, tr(v)).clicked() {
                             self.apply_named_view(v);
                         }
                     }
                 });
                 let b = &mut self.browser;
-                eye_header(ui, t, "Origin", &mut b.origin_visible, |ui| {
+                eye_header(ui, t, tr("Origin"), &mut b.origin_visible, |ui| {
                     for (i, name) in ["XY", "XZ", "YZ"].iter().enumerate() {
                         if let Some(v) = b.planes.get_mut(i) {
                             eye_row(ui, t, name, v);
@@ -1527,7 +1529,7 @@ impl FormCraftApp {
                         }
                     }
                 });
-                egui::CollapsingHeader::new("Sketches").default_open(true).show(ui, |ui| {
+                egui::CollapsingHeader::new(tr("Sketches")).default_open(true).show(ui, |ui| {
                     let sketches: Vec<(FeatureId, String)> = self
                         .session
                         .document()
@@ -1537,7 +1539,7 @@ impl FormCraftApp {
                         .map(|f| (f.id, f.name.clone()))
                         .collect();
                     if sketches.is_empty() {
-                        ui.label(egui::RichText::new("(none)").color(t.text_secondary));
+                        ui.label(egui::RichText::new(tr("(none)")).color(t.text_secondary));
                     }
                     for (id, name) in sketches {
                         ui.horizontal(|ui| {
@@ -1546,9 +1548,9 @@ impl FormCraftApp {
                             let dof = self.session.model().sketch(id).map(|s| s.dof);
                             let resp = ui.selectable_label(false, &name);
                             let resp = match dof {
-                                Some(0) => resp.on_hover_text("Fully constrained"),
-                                Some(n) => resp.on_hover_text(format!("{n} degrees of freedom")),
-                                None => resp.on_hover_text("Failed to compute"),
+                                Some(0) => resp.on_hover_text(tr("Fully constrained")),
+                                Some(n) => resp.on_hover_text(format!("{n} {}", tr("degrees of freedom"))),
+                                None => resp.on_hover_text(tr("Failed to compute")),
                             };
                             if resp.double_clicked() {
                                 self.edit_feature(id);
@@ -1556,11 +1558,11 @@ impl FormCraftApp {
                         });
                     }
                 });
-                egui::CollapsingHeader::new("Bodies").default_open(true).show(ui, |ui| {
+                egui::CollapsingHeader::new(tr("Bodies")).default_open(true).show(ui, |ui| {
                     let bodies: Vec<(BodyId, String, bool)> =
                         self.session.model().bodies.iter().map(|b| (b.id, b.name.clone(), b.visible)).collect();
                     if bodies.is_empty() {
-                        ui.label(egui::RichText::new("(none)").color(t.text_secondary));
+                        ui.label(egui::RichText::new(tr("(none)")).color(t.text_secondary));
                     }
                     for (id, name, visible) in bodies {
                         ui.horizontal(|ui| {
@@ -1626,7 +1628,7 @@ impl FormCraftApp {
             }
             Dock::Floating => {
                 let mut open = true;
-                egui::Window::new("Browser")
+                egui::Window::new(tr("Browser"))
                     .id(Id::new("browser_window"))
                     .title_bar(false)
                     .frame(card)
@@ -1704,7 +1706,7 @@ impl FormCraftApp {
                     ui.horizontal_centered(|ui| {
                         let r = ui.add(
                             egui::Label::new(
-                                egui::RichText::new("TEXT COMMANDS")
+                                egui::RichText::new(tr("TEXT COMMANDS"))
                                     .size(SIZE.font_group)
                                     .extra_letter_spacing(SIZE.group_letter_spacing)
                                     .color(t.group_label),
@@ -1712,7 +1714,7 @@ impl FormCraftApp {
                             .sense(Sense::click()),
                         );
                         // ▴ (drawn: the UI font has no such glyph)
-                        let (tri, tr) = ui.allocate_exact_size(Vec2::splat(SIZE.font_group), Sense::click());
+                        let (tri, tri_resp) = ui.allocate_exact_size(Vec2::splat(SIZE.font_group), Sense::click());
                         let c = tri.center();
                         let h = SIZE.font_group * 0.35;
                         ui.painter().add(egui::Shape::convex_polygon(
@@ -1720,7 +1722,7 @@ impl FormCraftApp {
                             t.group_label,
                             Stroke::NONE,
                         ));
-                        if r.on_hover_text("Show Text Commands").clicked() || tr.clicked() {
+                        if r.on_hover_text(tr("Show Text Commands")).clicked() || tri_resp.clicked() {
                             self.layout.text_commands.open = true;
                         }
                     });
@@ -1737,13 +1739,13 @@ impl FormCraftApp {
             .show_collapsible(ui, &mut open, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(
-                        egui::RichText::new("TEXT COMMANDS")
+                        egui::RichText::new(tr("TEXT COMMANDS"))
                             .size(SIZE.font_group)
                             .extra_letter_spacing(SIZE.group_letter_spacing)
                             .color(t.group_label),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icons::button(ui, t, "dropdown", "Collapse", 16.0, true, false).clicked() {
+                        if icons::button(ui, t, "dropdown", tr("Collapse"), 16.0, true, false).clicked() {
                             self.layout.text_commands.open = false;
                         }
                     });
@@ -1913,7 +1915,7 @@ impl FormCraftApp {
             match viewcube::show(ui, area, &self.camera, t) {
                 Some(CubeAction::View(v)) => {
                     self.camera.look_from(v.dir());
-                    self.status = format!("View: {}", v.label().unwrap_or("custom"));
+                    self.status = format!("{} {}", tr("View:"), tr(v.label().unwrap_or("custom")));
                 }
                 Some(CubeAction::Home) => self.apply_named_view("HOME"),
                 None => {}
@@ -1927,7 +1929,7 @@ impl FormCraftApp {
         painter.text(
             rect.left_bottom() + Vec2::new(10.0, -10.0),
             Align2::LEFT_BOTTOM,
-            &self.status,
+            tr(&self.status),
             FontId::proportional(12.0),
             t.text_secondary,
         );
@@ -2030,8 +2032,8 @@ impl FormCraftApp {
             if let Some(h) = hit {
                 let body = self.session.document().body_name(h.body());
                 let text = match h {
-                    Pick::Face { .. } => format!("Face · {body}"),
-                    Pick::Edge { .. } => format!("Edge · {body}"),
+                    Pick::Face { .. } => format!("{} · {body}", tr("Face")),
+                    Pick::Edge { .. } => format!("{} · {body}", tr("Edge")),
                     Pick::Body { .. } => body,
                 };
                 resp.clone().on_hover_text_at_pointer(text);
@@ -2057,12 +2059,16 @@ impl FormCraftApp {
             [one] => {
                 let body = self.session.document().body_name(one.body());
                 match one {
-                    Pick::Body { .. } => format!("Selected: {body}"),
-                    Pick::Face { index, .. } => format!("Selected: face {index} of {body}"),
-                    Pick::Edge { index, .. } => format!("Selected: edge {index} of {body}"),
+                    Pick::Body { .. } => format!("{} {body}", tr("Selected:")),
+                    Pick::Face { index, .. } => {
+                        format!("{} {} {index} {} {body}", tr("Selected:"), tr("face"), tr("of"))
+                    }
+                    Pick::Edge { index, .. } => {
+                        format!("{} {} {index} {} {body}", tr("Selected:"), tr("edge"), tr("of"))
+                    }
                 }
             }
-            many => format!("{} items selected", many.len()),
+            many => format!("{} {}", many.len(), tr("items selected")),
         }
     }
 
@@ -2174,32 +2180,34 @@ impl FormCraftApp {
                     ui.horizontal_centered(|ui| {
                         ui.spacing_mut().item_spacing.x = SIZE.grid;
                         for (mode, icon, tip) in [
-                            (NavMode::Orbit, "orbit", "Orbit (Shift + middle drag)"),
-                            (NavMode::Pan, "pan", "Pan (middle drag)"),
-                            (NavMode::Zoom, "zoom", "Zoom (wheel)"),
+                            (NavMode::Orbit, "orbit", tr("Orbit (Shift + middle drag)")),
+                            (NavMode::Pan, "pan", tr("Pan (middle drag)")),
+                            (NavMode::Zoom, "zoom", tr("Zoom (wheel)")),
                         ] {
                             let on = self.nav == mode;
                             if icons::button(ui, t, icon, tip, button, true, on).clicked() {
                                 self.nav = if on { NavMode::Select } else { mode };
                             }
                         }
-                        if icons::button(ui, t, "fit", "Fit (F6, double-click middle button)", button, true, false)
+                        if icons::button(ui, t, "fit", tr("Fit (F6, double-click middle button)"), button, true, false)
                             .clicked()
                         {
                             self.fit();
                         }
                         ui.separator();
-                        let style = icons::button(ui, t, "style", "Visual Style", button, true, false);
+                        let style = icons::button(ui, t, "style", tr("Visual Style"), button, true, false);
                         egui::Popup::menu(&style).show(|ui| {
                             for s in VisualStyle::ALL {
-                                ui.selectable_value(&mut self.layout.visual_style, s, s.label());
+                                ui.selectable_value(&mut self.layout.visual_style, s, tr(s.label()));
                             }
                         });
-                        if icons::button(ui, t, "grid", "Grid", button, true, self.layout.grid).clicked() {
+                        if icons::button(ui, t, "grid", tr("Grid"), button, true, self.layout.grid).clicked() {
                             self.layout.grid = !self.layout.grid;
                         }
                         let persp = self.camera.projection == Projection::Perspective;
-                        if icons::button(ui, t, "ortho", "Orthographic / Perspective", button, true, !persp).clicked() {
+                        if icons::button(ui, t, "ortho", tr("Orthographic / Perspective"), button, true, !persp)
+                            .clicked()
+                        {
                             self.camera.projection =
                                 if persp { Projection::Orthographic } else { Projection::Perspective };
                         }
@@ -2361,11 +2369,14 @@ impl FormCraftApp {
                 crate::theme::card(t).stroke(Stroke::new(1.0, t.error)).show(ui, |ui| {
                     ui.set_max_width(SIZE.assistant_w);
                     ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new(format!("{name} failed")).strong().color(t.error));
-                        let more =
-                            if failed.len() > 1 { format!(" (+{} more)", failed.len() - 1) } else { String::new() };
+                        ui.label(egui::RichText::new(format!("{name} {}", tr("failed"))).strong().color(t.error));
+                        let more = if failed.len() > 1 {
+                            format!(" (+{} {})", failed.len() - 1, tr("more"))
+                        } else {
+                            String::new()
+                        };
                         ui.label(egui::RichText::new(more).color(t.text_secondary));
-                        if ui.button("Show").clicked() {
+                        if ui.button(tr("Show")).clicked() {
                             self.toast = None;
                             self.edit_feature(id);
                         }
@@ -2382,7 +2393,7 @@ fn eye_toggle(ui: &mut Ui, t: &Tokens, visible: &mut bool) {
     let (rect, resp) = ui.allocate_exact_size(Vec2::splat(16.0), Sense::click());
     let c = if *visible { t.text_primary } else { t.text_secondary.gamma_multiply(0.5) };
     crate::icons::paint(ui.painter(), rect, "eye", c, t);
-    if resp.on_hover_text(if *visible { "Hide" } else { "Show" }).clicked() {
+    if resp.on_hover_text(if *visible { tr("Hide") } else { tr("Show") }).clicked() {
         *visible = !*visible;
     }
 }

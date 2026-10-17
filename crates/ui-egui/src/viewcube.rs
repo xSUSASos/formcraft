@@ -6,6 +6,7 @@ use egui::{Align2, Color32, FontId, Pos2, Rect, Sense, Shape, Stroke, Ui, Vec2, 
 use formcraft_render::camera::{Camera, CubeView};
 use glam::DVec3;
 
+use crate::i18n::tr;
 use crate::theme::Tokens;
 
 /// Result of interacting with the cube this frame.
@@ -121,7 +122,7 @@ pub fn show(ui: &mut Ui, area: Rect, cam: &Camera, t: &Tokens) -> Option<CubeAct
             painter.text(
                 proj.to_screen(n),
                 Align2::CENTER_CENTER,
-                label,
+                tr(label),
                 FontId::proportional(size),
                 t.cube_text.gamma_multiply(alpha),
             );
@@ -139,7 +140,7 @@ pub fn show(ui: &mut Ui, area: Rect, cam: &Camera, t: &Tokens) -> Option<CubeAct
 
     // Home button.
     let home = Rect::from_min_size(area.min + Vec2::new(2.0, 2.0), Vec2::splat(18.0));
-    let home_resp = ui.interact(home, ui.id().with("viewcube_home"), Sense::click()).on_hover_text("Home");
+    let home_resp = ui.interact(home, ui.id().with("viewcube_home"), Sense::click()).on_hover_text(tr("Home"));
     let hc = if home_resp.hovered() { t.accent_hover } else { t.text_secondary };
     let roof = [
         pos2(home.center().x, home.top() + 2.0),
