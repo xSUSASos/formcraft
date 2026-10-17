@@ -292,7 +292,7 @@ fn ai_bench(args: &[String]) -> Result<(), String> {
     let cases: Vec<bench::Case> =
         bench::cases()?.into_iter().filter(|c| level.as_deref().is_none_or(|l| c.level == l)).take(limit).collect();
     let config = formcraft_ai::AiConfig::from_env();
-    let g = std::sync::Arc::new(formcraft_ai::Generator::new(config.build()?));
+    let g = std::sync::Arc::new(formcraft_ai::Generator::from_config(&config)?);
     eprintln!("ai-bench: {} cases, {} · {}", cases.len(), config.backend, config.model);
     let n = cases.len();
     let report = bench::run(&g, &cases, &mut |i, r| {
@@ -335,7 +335,7 @@ fn ai(args: &[String]) -> Result<(), String> {
     let prompt = prompt.ok_or("ai needs a request in quotes")?;
     let s = new_session();
     let config = formcraft_ai::AiConfig::from_env();
-    let generator = std::sync::Arc::new(formcraft_ai::Generator::new(config.build()?));
+    let generator = std::sync::Arc::new(formcraft_ai::Generator::from_config(&config)?);
     eprintln!("{} · {} …", config.backend, config.model);
     let req = formcraft_ai::AiRequest { prompt, use_selection: false };
     let cancel = std::sync::atomic::AtomicBool::new(false);

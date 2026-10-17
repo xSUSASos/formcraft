@@ -430,7 +430,10 @@ impl FormCraftApp {
                             Err(e) => format!("{}: {e}", backend.kind()),
                         };
                         if matches!(action, crate::settings::SettingsAction::ApplyAi) {
-                            self.assistant.generator = Some(std::sync::Arc::new(formcraft_ai::Generator::new(backend)));
+                            match formcraft_ai::Generator::from_config(&self.layout.settings.ai_config()) {
+                                Ok(g) => self.assistant.generator = Some(std::sync::Arc::new(g)),
+                                Err(e) => self.ai_check = e,
+                            }
                         }
                     }
                     Err(e) => self.ai_check = e,

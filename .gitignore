@@ -6,3 +6,4 @@ spikes/*/Cargo.lock
 /logs/
 *.gguf
 /plan/
+dist/

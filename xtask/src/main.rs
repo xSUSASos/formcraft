@@ -1,5 +1,6 @@
 //! Workspace tooling: `cargo xtask <command>`.
 
+mod dist;
 mod layers;
 
 use std::path::{Path, PathBuf};
@@ -12,6 +13,7 @@ commands:
   ci       fmt --check, clippy -D warnings, test, layers, deny (stops at the first failure)
   layers   enforce the crate dependency layering (docs/architecture.md)
   deny     cargo deny check (licenses, advisories, bans, sources)
+  dist [--no-build]  release packages into dist/: portable zip, .msi (WiX) or AppImage
   mcp-install      build formcraft-cli and copy it to target/mcp/ (the binary .mcp.json runs, so
                    rebuilding target/debug is never blocked by a running MCP server)
   ai-bench [args]  run the AI benchmark against the configured LLM (needs a running Ollama;
@@ -25,6 +27,7 @@ fn main() -> ExitCode {
         Some("layers") => layers(),
         Some("deny") => deny(),
         Some("mcp-install") => mcp_install(),
+        Some("dist") => dist::dist(&args[1..]),
         Some("ai-bench") => {
             let mut a = vec!["run", "--release", "-p", "formcraft-cli", "--", "ai-bench"];
             a.extend(args.iter().skip(1).map(String::as_str));

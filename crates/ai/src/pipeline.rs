@@ -70,6 +70,8 @@ pub struct AiRequest {
 
 pub struct Generator {
     pub backend: Arc<dyn LlmBackend>,
+    /// Send the plan schema for grammar-constrained decoding.
+    pub structured: bool,
     pub max_attempts: usize,
     /// Few-shot examples per request (closest to the prompt).
     pub fewshot: usize,
@@ -81,7 +83,24 @@ pub struct Generator {
 
 impl Generator {
     pub fn new(backend: Arc<dyn LlmBackend>) -> Self {
-        Generator { backend, max_attempts: 3, fewshot: 3, temperature: 0.1, max_tokens: 2048, log: true }
+        Generator {
+            backend,
+            structured: true,
+            max_attempts: 3,
+            fewshot: 3,
+            temperature: 0.1,
+            max_tokens: 1200,
+            log: true,
+        }
+    }
+
+    /// A generator for a backend configuration (decoding mode and token limit included).
+    pub fn from_config(c: &crate::backend::AiConfig) -> Result<Self, String> {
+        let mut g = Generator::new(c.build()?);
+        g.structured = c.structured;
+        g.max_tokens = c.max_tokens;
+        g.temperature = c.temperature;
+        Ok(g)
     }
 
     /// The conversation for the first attempt.
@@ -113,6 +132,7 @@ impl Generator {
         }
         let start = Instant::now();
         let mut messages = self.messages(base, req);
+        let base_len = messages.len();
         let schema = prompt::output_schema_for(base.registry(), !base.document().features.is_empty());
         let of = self.max_attempts.max(1);
         let mut attempts = Vec::new();
@@ -129,7 +149,7 @@ impl Generator {
             let t = Instant::now();
             let chat = ChatRequest {
                 messages: messages.clone(),
-                schema: Some(schema.clone()),
+                schema: self.structured.then(|| schema.clone()),
                 temperature: self.temperature,
                 max_tokens: self.max_tokens,
             };
@@ -143,7 +163,23 @@ impl Generator {
             if cancel.load(Ordering::Relaxed) {
                 return Err(AiError::Cancelled);
             }
-            let tried = plan::parse(&reply.text).and_then(|p| {
+            // a reply that ran into the token limit is cut off (often a repetition loop)
+            let truncated = reply.output_tokens.is_some_and(|n| n >= u64::from(self.max_tokens));
+            let parsed = plan::parse(&reply.text).map_err(|e| {
+                if truncated {
+                    plan::PlanError {
+                        step: 0,
+                        command: String::new(),
+                        message: format!(
+                            "your answer was cut off after {} tokens (it kept repeating); answer again with a short plan: few points, no repeated values",
+                            self.max_tokens
+                        ),
+                    }
+                } else {
+                    e
+                }
+            });
+            let tried = parsed.and_then(|p| {
                 let mut preview = base.fork();
                 let label = format!("AI: {}", p.summary.trim());
                 let added = plan::apply(&mut preview, &p, &label)?;
@@ -173,6 +209,9 @@ impl Generator {
                 Err(e) => {
                     last = e.to_string();
                     attempts.push(Attempt { reply: reply.text.clone(), error: Some(last.clone()), seconds: secs });
+                    // keep only the latest failed attempt: the prompt stays short (CPU inference
+                    // time grows with it) and the model sees one clear error
+                    messages.truncate(base_len);
                     messages.push(Message::assistant(reply.text));
                     messages.push(Message::user(format!(
                         "That plan failed: {last}\nFix the problem and answer with the complete corrected JSON plan."

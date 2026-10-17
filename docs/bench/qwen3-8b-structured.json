@@ -1,0 +1,611 @@
+{
+  "backend": "ollama",
+  "cases": [
+    {
+      "attempts": 0,
+      "id": "block_50_30_20",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (doc.parameter): invalid parameters: missing `name` (string)"
+      ],
+      "rebuilt": false,
+      "seconds": 215.6029133,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "plate_100_60_8",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (solid.box): invalid parameters: missing `size` ([x, y, z])"
+      ],
+      "rebuilt": false,
+      "seconds": 249.7355827,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "cube_25",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): parameter name `` is not valid (letters, digits, _; not a unit name)"
+      ],
+      "rebuilt": false,
+      "seconds": 208.8854561,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "disc_d80_t6",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): parameter name `` is not valid (letters, digits, _; not a unit name)"
+      ],
+      "rebuilt": false,
+      "seconds": 186.5277762,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "disc_d45_h15",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): parameter name `:AC=9)G2$%)'+DC&/+.` is not valid (letters, digits, _; not a unit name)"
+      ],
+      "rebuilt": false,
+      "seconds": 259.6694575,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "plate_centre_hole",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): parameter name `/=/>,G,>//%H#1)&H8.$!;<B'=92$6$F//!?D'97:>&CE?1<*B*+<&G=9->H66<%5D-5EH:B,)+A#.C*1D/!B,>D6/49*BE%3A9G+/2:5` is not valid (letters, digits, _; not a unit name)"
+      ],
+      "rebuilt": false,
+      "seconds": 201.5046847,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "plate_corner_holes",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (doc.parameter): invalid parameters: missing `name` (string)"
+      ],
+      "rebuilt": false,
+      "seconds": 133.2595146,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "plate_three_holes_row",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (doc.parameter): invalid parameters: missing `name` (string)"
+      ],
+      "rebuilt": false,
+      "seconds": 145.846012,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "plate_six_holes_grid",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): parameter name `` is not valid (letters, digits, _; not a unit name)"
+      ],
+      "rebuilt": false,
+      "seconds": 212.8071523,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "washer_m8",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (solid.sphere): invalid parameters: missing `radius` or `diameter`"
+      ],
+      "rebuilt": false,
+      "seconds": 131.6498818,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "washer_d30",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (doc.parameter): invalid parameters: missing `name` (string)"
+      ],
+      "rebuilt": false,
+      "seconds": 369.5847839,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "spacer_tube_12_6",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (doc.parameter): invalid parameters: missing `name` (string)"
+      ],
+      "rebuilt": false,
+      "seconds": 186.7818715,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "pipe_50_44",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (doc.parameter): invalid parameters: missing `name` (string)"
+      ],
+      "rebuilt": false,
+      "seconds": 177.7396953,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "square_tube_30",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): the plan made no solid body: extrude or revolve the sketch, or use solid.box / solid.cylinder"
+      ],
+      "rebuilt": false,
+      "seconds": 155.7274506,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "l_profile_40_30",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (solid.cylinder): invalid parameters: missing `radius` or `diameter`"
+      ],
+      "rebuilt": false,
+      "seconds": 226.3936332,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "t_profile_60_40",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): the plan made no solid body: extrude or revolve the sketch, or use solid.box / solid.cylinder"
+      ],
+      "rebuilt": false,
+      "seconds": 110.7717628,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "u_profile_50_25",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): parameter name `+?'>'DA1)$'C'CB,GAD)F+C6` is not valid (letters, digits, _; not a unit name)"
+      ],
+      "rebuilt": false,
+      "seconds": 176.7923856,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "cylinder_through_bore",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (doc.parameter): invalid parameters: missing `name` (string)"
+      ],
+      "rebuilt": false,
+      "seconds": 338.0695582,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "sleeve_25_15",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (doc.parameter): invalid parameters: missing `name` (string)"
+      ],
+      "rebuilt": false,
+      "seconds": 259.6370176,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "plate_window",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (doc.parameter): invalid parameters: missing `name` (string)"
+      ],
+      "rebuilt": false,
+      "seconds": 181.1946573,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "stepped_boss_40_20",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): the reply contains no JSON object"
+      ],
+      "rebuilt": false,
+      "seconds": 303.1883453,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "step_block",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (doc.parameter): invalid parameters: missing `name` (string)"
+      ],
+      "rebuilt": false,
+      "seconds": 81.2881346,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "pin_d6_l40",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (doc.parameter): invalid parameters: missing `name` (string)"
+      ],
+      "rebuilt": false,
+      "seconds": 304.9833916,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "plate_offset_hole",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): parameter name `<&9'-7;F%?6$;;$/8%2=,7,+H'!F%16>),!F,` is not valid (letters, digits, _; not a unit name)"
+      ],
+      "rebuilt": false,
+      "seconds": 234.9114876,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "triangle_prism",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (doc.parameter): invalid parameters: missing `name` (string)"
+      ],
+      "rebuilt": false,
+      "seconds": 158.2727171,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "cube_through_hole",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): the reply contains no JSON object"
+      ],
+      "rebuilt": false,
+      "seconds": 283.4824271,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "flat_bar_two_holes",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): parameter name `` is not valid (letters, digits, _; not a unit name)"
+      ],
+      "rebuilt": false,
+      "seconds": 182.7888321,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "block_blind_hole",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): parameter name `.7,.4:.+EB/%C,9C!$E+,,3F%D9*%?A)#:)'G` is not valid (letters, digits, _; not a unit name)"
+      ],
+      "rebuilt": false,
+      "seconds": 228.7545119,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "square_plate_diag_holes",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (doc.parameter): invalid parameters: missing `name` (string)"
+      ],
+      "rebuilt": false,
+      "seconds": 197.6040619,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "brick_80_20_15_two_holes",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (solid.shell): invalid parameters: there is no body yet"
+      ],
+      "rebuilt": false,
+      "seconds": 181.0495618,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "plate_rounded_corners",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (solid.extrude): invalid parameters: no sketch: create one with sketch.create"
+      ],
+      "rebuilt": false,
+      "seconds": 223.0506227,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "plate_rounded_4_holes",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (doc.parameter): invalid parameters: missing `name` (string)"
+      ],
+      "rebuilt": false,
+      "seconds": 146.290642,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "block_top_chamfer",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): the reply contains no JSON object"
+      ],
+      "rebuilt": false,
+      "seconds": 348.8363276,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "counterbore_plate_4",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): parameter name `` is not valid (letters, digits, _; not a unit name)"
+      ],
+      "rebuilt": false,
+      "seconds": 178.854811,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "flange_6_holes_bore",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): parameter name `4;#;6.5+=+!$HG7*76` is not valid (letters, digits, _; not a unit name)"
+      ],
+      "rebuilt": false,
+      "seconds": 282.494946,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "flange_8_holes_bore",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): parameter name `` is not valid (letters, digits, _; not a unit name)"
+      ],
+      "rebuilt": false,
+      "seconds": 212.9055469,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "open_box_80_50_30",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (doc.parameter): invalid parameters: missing `name` (string)"
+      ],
+      "rebuilt": false,
+      "seconds": 168.4311102,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "enclosure_rounded",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): the reply contains no JSON object"
+      ],
+      "rebuilt": false,
+      "seconds": 289.1978927,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "stepped_shaft_3",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): the reply contains no JSON object"
+      ],
+      "rebuilt": false,
+      "seconds": 418.6713563,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "stepped_shaft_4",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): the reply contains no JSON object"
+      ],
+      "rebuilt": false,
+      "seconds": 363.7435604,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "shaft_keyway_d16",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (solid.box): invalid parameters: missing `size` ([x, y, z])"
+      ],
+      "rebuilt": false,
+      "seconds": 256.5053522,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "slot_plate_100_40",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): parameter name `` is not valid (letters, digits, _; not a unit name)"
+      ],
+      "rebuilt": false,
+      "seconds": 243.4158688,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "plate_with_boss_hole",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (solid.shell): invalid parameters: there is no body yet"
+      ],
+      "rebuilt": false,
+      "seconds": 186.3103122,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "l_bracket_base_holes",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): invalid JSON: number out of range at line 1 column 20"
+      ],
+      "rebuilt": false,
+      "seconds": 429.411526,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "cube_filleted",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): invalid JSON: number out of range at line 2 column 22"
+      ],
+      "rebuilt": false,
+      "seconds": 330.7471157,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "cylinder_chamfered",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): the reply contains no JSON object"
+      ],
+      "rebuilt": false,
+      "seconds": 449.8102276,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "block_corner_notch",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (doc.parameter): invalid parameters: missing `name` (string)"
+      ],
+      "rebuilt": false,
+      "seconds": 93.0193893,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "flanged_bushing",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): the reply contains no JSON object"
+      ],
+      "rebuilt": false,
+      "seconds": 280.6735801,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "plate_bolt_circle_45",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (doc.parameter): invalid parameters: missing `name` (string)"
+      ],
+      "rebuilt": false,
+      "seconds": 425.0144948,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "cup_d50",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (solid.extrude): invalid parameters: no sketch: create one with sketch.create"
+      ],
+      "rebuilt": false,
+      "seconds": 173.9091842,
+      "valid": false
+    }
+  ],
+  "matched_pct": 0.0,
+  "mean_seconds": 235.71597169799995,
+  "model": "qwen3:8b",
+  "rebuilt_pct": 0.0,
+  "simple_valid_pct": 0.0,
+  "valid_pct": 0.0
+}

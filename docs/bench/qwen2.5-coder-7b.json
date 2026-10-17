@@ -1,0 +1,579 @@
+{
+  "backend": "ollama",
+  "cases": [
+    {
+      "attempts": 1,
+      "id": "block_50_30_20",
+      "level": "simple",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 93.0895348,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "plate_100_60_8",
+      "level": "simple",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 37.9462575,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "cube_25",
+      "level": "simple",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 25.1663388,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "disc_d80_t6",
+      "level": "simple",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 33.5246897,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "disc_d45_h15",
+      "level": "simple",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 27.4558303,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "plate_centre_hole",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "cylindrical faces 0 ≠ 1"
+      ],
+      "rebuilt": true,
+      "seconds": 26.9649199,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "plate_corner_holes",
+      "level": "simple",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 55.4854668,
+      "valid": true
+    },
+    {
+      "attempts": 0,
+      "id": "plate_three_holes_row",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): invalid JSON: trailing characters at line 1 column 179"
+      ],
+      "rebuilt": false,
+      "seconds": 616.4812579,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "plate_six_holes_grid",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): invalid JSON: trailing characters at line 1 column 312"
+      ],
+      "rebuilt": false,
+      "seconds": 600.6317929,
+      "valid": false
+    },
+    {
+      "attempts": 1,
+      "id": "washer_m8",
+      "level": "simple",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 32.9193775,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "washer_d30",
+      "level": "simple",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 37.9614976,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "spacer_tube_12_6",
+      "level": "simple",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 37.0784865,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "pipe_50_44",
+      "level": "simple",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 38.209046,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "square_tube_30",
+      "level": "simple",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 38.8333189,
+      "valid": true
+    },
+    {
+      "attempts": 0,
+      "id": "l_profile_40_30",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): invalid JSON: trailing characters at line 1 column 130"
+      ],
+      "rebuilt": false,
+      "seconds": 652.0230588,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "t_profile_60_40",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): the plan made no solid body: extrude or revolve the sketch, or use solid.box / solid.cylinder"
+      ],
+      "rebuilt": false,
+      "seconds": 74.8917033,
+      "valid": false
+    },
+    {
+      "attempts": 1,
+      "id": "u_profile_50_25",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "size [4.0, 21.0, 60.0] ≠ [50.0, 25.0, 60.0]",
+        "volume 2520.0 ≠ 22080.0"
+      ],
+      "rebuilt": true,
+      "seconds": 36.3598526,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "cylinder_through_bore",
+      "level": "simple",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 35.2472827,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "sleeve_25_15",
+      "level": "simple",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 34.648144,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "plate_window",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "volume 20000.0 ≠ 16000.0"
+      ],
+      "rebuilt": true,
+      "seconds": 39.4033707,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "stepped_boss_40_20",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "size [40.0, 40.0, 15.0] ≠ [40.0, 40.0, 25.0]",
+        "volume 14137.2 ≠ 17278.8"
+      ],
+      "rebuilt": true,
+      "seconds": 38.9501613,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "step_block",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "size [60.0, 40.0, 10.0] ≠ [60.0, 40.0, 20.0]",
+        "volume 24000.0 ≠ 36000.0"
+      ],
+      "rebuilt": true,
+      "seconds": 39.7937046,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "pin_d6_l40",
+      "level": "simple",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 23.1570818,
+      "valid": true
+    },
+    {
+      "attempts": 0,
+      "id": "plate_offset_hole",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 1 (sketch.create): invalid parameters: rectangle size must not be zero"
+      ],
+      "rebuilt": false,
+      "seconds": 101.6011566,
+      "valid": false
+    },
+    {
+      "attempts": 0,
+      "id": "triangle_prism",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): invalid JSON: trailing characters at line 1 column 102"
+      ],
+      "rebuilt": false,
+      "seconds": 621.4315525,
+      "valid": false
+    },
+    {
+      "attempts": 1,
+      "id": "cube_through_hole",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "volume 63214.6 ≠ 60858.4"
+      ],
+      "rebuilt": true,
+      "seconds": 34.3523525,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "flat_bar_two_holes",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "cylindrical faces 0 ≠ 2"
+      ],
+      "rebuilt": true,
+      "seconds": 42.6829245,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "block_blind_hole",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "cylindrical faces 0 ≠ 1"
+      ],
+      "rebuilt": true,
+      "seconds": 33.914337,
+      "valid": true
+    },
+    {
+      "attempts": 3,
+      "id": "square_plate_diag_holes",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "cylindrical faces 0 ≠ 2"
+      ],
+      "rebuilt": true,
+      "seconds": 105.6376038,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "brick_80_20_15_two_holes",
+      "level": "simple",
+      "matched": false,
+      "notes": [
+        "cylindrical faces 1 ≠ 2"
+      ],
+      "rebuilt": true,
+      "seconds": 52.7820245,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "plate_rounded_corners",
+      "level": "medium",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 38.980065,
+      "valid": true
+    },
+    {
+      "attempts": 0,
+      "id": "plate_rounded_4_holes",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 3 (solid.fillet): fillet failed: fillet: radius too large for the selected edges or geometry not supported"
+      ],
+      "rebuilt": false,
+      "seconds": 155.2017021,
+      "valid": false
+    },
+    {
+      "attempts": 1,
+      "id": "block_top_chamfer",
+      "level": "medium",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 32.9183672,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "counterbore_plate_4",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "size [40.0, 40.0, 7.0] ≠ [60.0, 60.0, 12.0]",
+        "volume 3599.6 ≠ 40964.0",
+        "cylindrical faces 12 ≠ 8"
+      ],
+      "rebuilt": true,
+      "seconds": 72.2508113,
+      "valid": true
+    },
+    {
+      "attempts": 0,
+      "id": "flange_6_holes_bore",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): step 4 (solid.press_pull): no face matches `+X`"
+      ],
+      "rebuilt": false,
+      "seconds": 160.499457,
+      "valid": false
+    },
+    {
+      "attempts": 1,
+      "id": "flange_8_holes_bore",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "volume 169646.0 ≠ 163538.8",
+        "cylindrical faces 2 ≠ 10"
+      ],
+      "rebuilt": true,
+      "seconds": 51.8550214,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "open_box_80_50_30",
+      "level": "medium",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 40.2226915,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "enclosure_rounded",
+      "level": "medium",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 49.6867345,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "stepped_shaft_3",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "size [24.0, 24.0, 40.0] ≠ [24.0, 24.0, 90.0]",
+        "volume 29688.1 ≠ 23185.0",
+        "cylindrical faces 9 ≠ 3"
+      ],
+      "rebuilt": true,
+      "seconds": 51.5013406,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "stepped_shaft_4",
+      "level": "medium",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 54.8489737,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "shaft_keyway_d16",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "volume 10053.1 ≠ 9694.6"
+      ],
+      "rebuilt": true,
+      "seconds": 46.3256026,
+      "valid": true
+    },
+    {
+      "attempts": 3,
+      "id": "slot_plate_100_40",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "volume 19927.0 ≠ 21128.8",
+        "cylindrical faces 16 ≠ 2"
+      ],
+      "rebuilt": true,
+      "seconds": 162.9993165,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "plate_with_boss_hole",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "size [60.0, 60.0, 8.0] ≠ [60.0, 60.0, 20.0]",
+        "volume 28800.0 ≠ 35711.5",
+        "cylindrical faces 0 ≠ 2"
+      ],
+      "rebuilt": true,
+      "seconds": 44.6901992,
+      "valid": true
+    },
+    {
+      "attempts": 0,
+      "id": "l_bracket_base_holes",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "no valid plan after 3 attempt(s): invalid JSON: trailing characters at line 1 column 196"
+      ],
+      "rebuilt": false,
+      "seconds": 630.8780686,
+      "valid": false
+    },
+    {
+      "attempts": 1,
+      "id": "cube_filleted",
+      "level": "medium",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 38.6451579,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "cylinder_chamfered",
+      "level": "medium",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 25.4991893,
+      "valid": true
+    },
+    {
+      "attempts": 2,
+      "id": "block_corner_notch",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "size [30.0, 20.0, 30.0] ≠ [60.0, 40.0, 30.0]",
+        "volume 18000.0 ≠ 54000.0"
+      ],
+      "rebuilt": true,
+      "seconds": 60.4876958,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "flanged_bushing",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "volume 11309.7 ≠ 10744.2"
+      ],
+      "rebuilt": true,
+      "seconds": 55.8179042,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "plate_bolt_circle_45",
+      "level": "medium",
+      "matched": false,
+      "notes": [
+        "cylindrical faces 0 ≠ 4"
+      ],
+      "rebuilt": true,
+      "seconds": 56.5788707,
+      "valid": true
+    },
+    {
+      "attempts": 1,
+      "id": "cup_d50",
+      "level": "medium",
+      "matched": true,
+      "notes": [],
+      "rebuilt": true,
+      "seconds": 36.008316,
+      "valid": true
+    }
+  ],
+  "matched_pct": 44.0,
+  "mean_seconds": 110.69039222800004,
+  "model": "qwen2.5-coder:7b",
+  "rebuilt_pct": 82.0,
+  "simple_valid_pct": 80.0,
+  "valid_pct": 82.0
+}

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=FormCraft
+Comment=Parametric 3D CAD with a local AI assistant
+Exec=formcraft
+Icon=formcraft
+Categories=Graphics;Engineering;3DGraphics;
+Terminal=false

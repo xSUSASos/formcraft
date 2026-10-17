@@ -75,6 +75,12 @@ pub struct AiConfig {
     pub timeout_secs: u64,
     /// Context window asked from Ollama.
     pub num_ctx: u32,
+    /// Constrain the reply to the plan's JSON schema (grammar decoding). Off for "thinking"
+    /// models (qwen3), which degenerate under the grammar; their reply is parsed after
+    /// `</think>` instead.
+    pub structured: bool,
+    /// Output token limit per reply (thinking models need more).
+    pub max_tokens: u32,
 }
 
 pub const DEFAULT_MODEL: &str = "qwen2.5-coder:7b";
@@ -88,6 +94,8 @@ impl Default for AiConfig {
             temperature: 0.1,
             timeout_secs: 600,
             num_ctx: 8192,
+            structured: true,
+            max_tokens: 1200,
         }
     }
 }
@@ -109,6 +117,19 @@ impl AiConfig {
         }
         if let Some(m) = var("FORMCRAFT_AI_MODEL") {
             c.model = m;
+        }
+        // thinking models: free-form reasoning, then the JSON plan
+        if c.model.starts_with("qwen3") || c.model.contains("deepseek-r1") {
+            c.structured = false;
+            c.max_tokens = 4096;
+        }
+        if let Some(v) = var("FORMCRAFT_AI_STRUCTURED") {
+            c.structured = !matches!(v.as_str(), "0" | "false" | "no" | "off");
+        }
+        if let Some(n) =
+            var("FORMCRAFT_AI_MAX_TOKENS").and_then(|n| n.parse::<u32>().ok()).filter(|n| (64..=32_768).contains(n))
+        {
+            c.max_tokens = n;
         }
         if let Some(t) = var("FORMCRAFT_AI_TIMEOUT").and_then(|t| t.parse::<u64>().ok()).filter(|t| *t > 0) {
             c.timeout_secs = t;

@@ -27,7 +27,7 @@ pub use plan::Plan;
 /// Register the assistant's commands (`ai.generate`, `ai.explain`, `ai.status`) with the
 /// backend from `config`. A bad config is reported, the rest of the app works without AI.
 pub fn install(s: &mut formcraft_engine::Session, config: &AiConfig) -> Result<Arc<Generator>, String> {
-    let generator = Arc::new(Generator::new(config.build()?));
+    let generator = Arc::new(Generator::from_config(config)?);
     commands::register(s, generator.clone()).map_err(|e| e.to_string())?;
     Ok(generator)
 }
