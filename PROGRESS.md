@@ -4,22 +4,11 @@
 > Сессии иногда обрываются: PROGRESS.md обновлять после каждого шага, сборки > 10 мин — фоном.
 
 ## Сейчас
-- **Фаза:** 5 — Встроенный ИИ (в работе). Фаза 4 закрыта, тег phase-4.
-- **Сделано в фазе 5:** шаги 1–4 (без UI): `Session::fork/transaction`, группы фич; крейт `ai` (свой HTTP-клиент, Ollama/OpenAI/Mock, промпт и схема из реестра, план, конвейер с исправлением до 3 попыток, логи, `ai.generate/explain/status`, 3 few-shot), `formcraft-cli ai "…"`. Тесты ai 13/13.
-- **Наблюдение (реальный прогон):** qwen2.5-coder:7b на CPU, «фланец D100, 4 отв. D9 на D80, толщина 10» — 3 попытки за 4 мин 10 с, каждая добавляла лишнее скругление с большим радиусом → ошибка. Разобрать по логам в ai-bench (правило «не добавлять то, чего не просили», больше few-shot).
-- **Сейчас:** фазы 5 и 6 параллельно. Фаза 5: всё кроме финального ai-bench (идёт прогон qwen2.5-coder:7b и qwen3:8b на CPU после исправлений), ADR 0005 и тега. Первый прогон qwen2.5-coder:7b: valid 68 %, rebuilt 68 %, matched 42 %, simple-valid 63.3 %, 161 с/кейс (CPU) — разобраны отказы, исправлены 4 класса ошибок (хвост после JSON, `feature.edit` при сборке с нуля, выдуманные имена тел, план без тела).
-- **Фаза 6 (в работе):** готово — WIT v1 (`crates/plugin-api/wit/formcraft.wit`), манифесты, хост wasmtime 49 (песочница WASI без файлов/сети, 256 МиБ, 2 с/вызов, выгрузка при trap/таймауте), custom features с замороженным телом, установка из zip, «Шестерня» (`examples/plugins/gear`), тест-плагин `spin`, Python-пакет `python/formcraft` + `examples/scripts/export_stl.py`, диалог Scripts and Add-Ins (Shift+S), add-ins в CLI/MCP, `formcraft-cli plugin install|list|new`, тест «ИИ вызывает команду плагина» (Mock). Осталось: пример «Масса по таблице материалов» и `docs/plugins/` (Sonnet), приёмка с реальной моделью «шестерня z=20 m=2», скриншоты UI (диалог Add-Ins, кнопка шестерни), learn/phase-6, тег.
-- **MCP к Claude Code (самопроверка):** `.mcp.json` → `target/mcp/formcraft-cli.exe mcp` (копию кладёт `cargo xtask mcp-install`, чтобы работающий сервер не блокировал сборку). Через подключённые инструменты `mcp__formcraft__run_script/inspect_model/render` собран кронштейн: объём 11619.2522 = (2400 − (4−π)·9 − 2π·3.3²)·5 точно, bbox 60×40×5, рендер верный.
-- **Приёмка любой фазы с UI** теперь включает `formcraft-cli screenshot all` и применимые пункты чек-листа UI_SPEC §8.
-- **План фазы 5:**
-  1. engine: fork, transaction + группы фич.
-  2. Крейт `ai`: `LlmBackend` (Ollama `/api/chat` со схемой в `format`, OpenAI-совместимый `/v1/chat/completions`, Mock), свой минимальный HTTP/1.1-клиент (только http, локальные серверы), конфиг из env (`FORMCRAFT_AI_BACKEND/URL/MODEL`).
-  3. Промпт и схема вывода из реестра (только команды с `ai`), план `{summary, parameters, steps}`, разбор с допуском (```json-обёртки), валидация.
-  4. Конвейер: LLM → план → применение на fork в transaction → проверка regen → до 3 попыток с отчётом об ошибке → Proposal (превью). Логи `logs/ai/*.jsonl`. Команды `ai.generate`, `ai.explain`, `ai.status`.
-  5. 20+ few-shot (делегировать Sonnet по формату), выбор k ближайших к запросу.
-  6. UI: S-box «Сделать с ИИ» → фон, превью полупрозрачно, Принять/Отклонить, статус «Генерация… / Исправление (2/3)…», отмена; Solid → Create → Generate (диалог); «Изменить с ИИ…» по выбору; «Объяснить» на таймлайне; панель Assistant.
-  7. `ai-bench`: 50 промптов с эталонами (bbox, объём, отверстия), Mock в CI; реальный прогон на Ollama, ADR 0004 «модель по умолчанию».
-  8. learn/phase-5, приёмка, тег.
+- **Фаза:** 7 — Шлифовка и релиз (в работе). Фазы 5 и 6 закрыты, теги phase-5, phase-6.
+- **Сделано в фазе 7:** Inspect (measure, section, properties с массой), импорт STEP как базового тела, 3MF, настройки (тема, язык, масштаб, анимации, сервер/модель ассистента), журнал приложения, RU/EN (≈170 строк, Sonnet), README, `cargo xtask dist` (zip, MSI через WiX, AppImage-скрипт), workflow `release.yml`.
+- **Следующий шаг:** релизная сборка `cargo xtask dist` (OCCT в release ≈ час), проверка portable и MSI, скриншоты фазы 7, learn/phase-7, итоговый отчёт, тег phase-7.
+- **Приёмка любой фазы с UI** включает `formcraft-cli screenshot all` и применимые пункты чек-листа UI_SPEC §8.
+- **MCP к Claude Code (самопроверка):** `.mcp.json` → `target/mcp/formcraft-cli.exe mcp` (`cargo xtask mcp-install`). Через подключённые `mcp__formcraft__*` собран кронштейн: объём 11619.2522 = (2400 − (4−π)·9 − 2π·3.3²)·5 точно, bbox 60×40×5, рендер верный.
 
 ## Приёмка UI-выравнивания (UI_SPEC.md §8)
 Снимки: `formcraft-cli screenshot all <dir>` (1920×1080, обе темы) → копии 1280×720 в `docs/images/ui/` (`<сцена>-light|dark.png`); тест `every_spec_scene_renders` рендерит все 8 сцен в CI. До/после: `docs/images/ui/before/`.
@@ -90,9 +79,9 @@
 | 2 Тело на экране | готово | phase-2 |
 | 3 Эскиз, фичи, таймлайн | готово | phase-3 |
 | 4 Команды, CLI, MCP | готово | phase-4 |
-| 5 Встроенный ИИ | в работе | — |
-| 6 Плагины и скрипты | — | — |
-| 7 Шлифовка и релиз | — | — |
+| 5 Встроенный ИИ | готово | phase-5 |
+| 6 Плагины и скрипты | готово | phase-6 |
+| 7 Шлифовка и релиз | в работе | — |
 
 ## Приёмка Фазы 0
 - ADR 0001: OCCT 5/5, STEP во FreeCAD чистый; truck 3/5 с ошибками STEP; Fornjot 0/5. Ядро за трейтом `Kernel` (`crates/kernel`) + `crates/occt` (своя обвязка).
@@ -122,6 +111,19 @@
 - «Claude Code через MCP строит кронштейн и проверяет через inspect_model и render»: выполнено (JSON-RPC в `formcraft-cli mcp` и `mcp --port` к живому окну, ответы выше).
 - ADR 0003 «Plugin API v1» + `crates/plugin-api/wit/formcraft.wit` (дизайн, реализация в фазе 6).
 - `.mcp.json` в корне: `target/debug/formcraft-cli.exe mcp` (новая сессия Claude Code подхватит после одобрения).
+
+## Приёмка Фазы 5
+- «Фланец Ø100, 4 отверстия Ø9 на Ø80, толщина 10» → корректная группа фич: реальная модель qwen2.5-coder:7b (Ollama, **CPU**): `formcraft-cli ai "фланец Ø100, 4 отверстия Ø9 на Ø80, толщина 10"` → Sketch1 + Extrude1 + Hole1 (4 точки на окружности Ø80), параметры flange_d/flange_t/bolt_circle_d/hole_d; объём 75995.1263 = π·50²·10 − 4·π·4.5²·10 точно, 5 цилиндрических граней; `docs/images/phase5-flange-ai.png`. Время **181 с на CPU** — требование «< 60 с» относится к GPU 12 ГБ; Ollama не видит RTX 4050 («Требует человека»), поэтому на этой машине не проверяемо.
+- ai-bench ≥ 70 % валидных на простых: **80 %** (qwen2.5-coder:7b, все 50 кейсов: valid 82 %, rebuilt 82 %, matched 44 %, 111 с/кейс на CPU). Выбор модели — ADR 0005 (qwen3:8b: 0 % под грамматикой, > 10 мин на ответ без неё на CPU). Отчёты — `docs/bench/`.
+- Mock в CI: `cargo test -p formcraft-ai` (17 тестов: цикл исправления, отказ после 3 попыток, группа и один шаг undo, промпт из реестра, fake-Ollama по HTTP, спасение обрезанного ответа, бенч на «оракуле»), `cargo test -p formcraft-ui-egui assistant` (фон → превью → Принять/Отклонить).
+- Точки входа: S-box «Сделать с ИИ», Solid › Create › Generate, marking menu «Изменить с ИИ…» (с выбором), ✦ в app bar, «Объяснить» на таймлайне; панель Assistant по UI_SPEC §5.12 (`docs/images/ui/7-ai-group-*.png`). Логи `…/FormCraft/logs/ai/*.jsonl`.
+
+## Приёмка Фазы 6
+- «Шестерня» устанавливается из zip: `install_from_zip_checks_paths`; кнопка Spur Gear в Solid › Create и диалог из схемы плагина: `gear_addin_button_dialog_and_timeline`, `docs/images/ui/9-addins-dark.png`; фича на таймлайне перестраивается при смене параметра: `gear_plugin_adds_a_parametric_feature` (z 20 → 30, правка через feature.edit, выгрузка → замороженное тело с предупреждением).
+- ИИ по запросу «шестерня z=20 m=2» вызывает команду плагина — **реальная модель**: `formcraft-cli --plugin examples/plugins/gear ai "шестерня z=20 m=2"` → одна фича `gear.spur` (Custom, ok), Ø вершин 44 = m·(z+2), 86 с на CPU; плюс тест на Mock `assistant_uses_the_gear_addin`.
+- Python-скрипт экспортирует все тела в STL: `examples/scripts/export_stl.py` против `formcraft --control` — два тела → Body1.stl, Body2.stl (прогон 2026-10-16).
+- Плагин с бесконечным циклом выгружается по таймауту без падения: `misbehaving_plugins_are_unloaded_not_fatal` (2 с, сессия цела, команды сняты; также 2 ГБ памяти и panic).
+- Шаблоны `formcraft-cli plugin new --lang rust|python-script`, `docs/plugins/README.md`, три примера (gear, material, export_stl.py), ADR 0003 с отличиями реализации.
 
 ## Журнал
 - 2026-10-14: репозиторий, PLAN, PROGRESS; Rust; изучен `../cadcraft-ref`.

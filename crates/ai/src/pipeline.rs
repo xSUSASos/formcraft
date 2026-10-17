@@ -150,7 +150,8 @@ impl Generator {
             let chat = ChatRequest {
                 messages: messages.clone(),
                 schema: self.structured.then(|| schema.clone()),
-                temperature: self.temperature,
+                // repairs get more randomness: at 0.1 a model repeats the same mistake
+                temperature: if attempt == 1 { self.temperature } else { (self.temperature + 0.4).min(1.0) },
                 max_tokens: self.max_tokens,
             };
             let reply = match self.backend.chat(&chat) {
@@ -165,7 +166,12 @@ impl Generator {
             }
             // a reply that ran into the token limit is cut off (often a repetition loop)
             let truncated = reply.output_tokens.is_some_and(|n| n >= u64::from(self.max_tokens));
-            let parsed = plan::parse(&reply.text).map_err(|e| {
+            let salvaged = if truncated { plan::salvage(&reply.text) } else { None };
+            let parsed = match salvaged {
+                Some(p) => Ok(p),
+                None => plan::parse(&reply.text),
+            }
+            .map_err(|e| {
                 if truncated {
                     plan::PlanError {
                         step: 0,

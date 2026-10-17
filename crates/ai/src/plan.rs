@@ -100,6 +100,67 @@ pub fn parse(text: &str) -> Result<Plan, PlanError> {
     Err(whole(last_err))
 }
 
+/// A reply cut off by the token limit: keep the complete part. Cuts the text after the last
+/// closed `}` where closing the still-open brackets gives a plan with steps (e.g. a repetition
+/// loop after correct steps). `None` when nothing usable is left.
+pub fn salvage(text: &str) -> Option<Plan> {
+    let start = text.find('{')?;
+    let body = text.get(start..)?;
+    let mut stack: Vec<char> = Vec::new();
+    let (mut in_str, mut esc) = (false, false);
+    let mut best = None;
+    let mut tries = 0;
+    for (i, c) in body.char_indices() {
+        if in_str {
+            match (esc, c) {
+                (true, _) => esc = false,
+                (false, '\\') => esc = true,
+                (false, '"') => in_str = false,
+                _ => {}
+            }
+            continue;
+        }
+        match c {
+            '"' => in_str = true,
+            '{' => stack.push('}'),
+            '[' => stack.push(']'),
+            '}' | ']' => {
+                if stack.pop() != Some(c) {
+                    break;
+                }
+                // a complete element inside `steps` (depth: object → steps array → element)
+                if c == '}' && stack.len() == 2 && tries < 400 {
+                    tries += 1;
+                    let mut candidate = body.get(..=i)?.to_string();
+                    candidate.extend(stack.iter().rev());
+                    if let Ok(p) = serde_json::from_str::<Plan>(&candidate)
+                        && !p.steps.is_empty()
+                    {
+                        best = Some(p);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    best.map(|mut p: Plan| {
+        // a loop shows up as the same step again (same command and scalar values, e.g. another
+        // hole of the same diameter): keep the plan up to the first repeat
+        let scalars = |s: &Step| -> Vec<(String, Value)> {
+            s.params
+                .as_object()
+                .map(|o| o.iter().filter(|(_, v)| !v.is_array() && !v.is_object()).map(|(k, v)| (k.clone(), v.clone())).collect())
+                .unwrap_or_default()
+        };
+        if let Some(i) = (1..p.steps.len()).find(|&i| {
+            matches!((p.steps.get(i - 1), p.steps.get(i)), (Some(a), Some(b)) if a.command == b.command && scalars(a) == scalars(b))
+        }) {
+            p.steps.truncate(i);
+        }
+        p
+    })
+}
+
 /// Static checks before anything runs: known AI commands, object params, sane sizes and names.
 pub fn validate(plan: &Plan, registry: &Registry) -> Result<(), PlanError> {
     if plan.steps.is_empty() {

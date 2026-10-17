@@ -169,7 +169,10 @@ impl LlmBackend for Ollama {
             "stream": false,
             "options": {"temperature": req.temperature, "num_predict": req.max_tokens, "num_ctx": self.num_ctx},
         });
-        body["format"] = req.schema.clone().unwrap_or(json!("json"));
+        // no schema = free text (thinking models answer after `</think>`; the parser finds the JSON)
+        if let Some(schema) = &req.schema {
+            body["format"] = schema.clone();
+        }
         let v = http::request(&self.url, "POST", "/api/chat", Some(&body), self.timeout)?;
         let text = v["message"]["content"].as_str().ok_or("Ollama reply without message.content")?.to_string();
         Ok(Reply {
@@ -222,10 +225,9 @@ impl LlmBackend for OpenAi {
             "model": self.model, "messages": req.messages,
             "temperature": req.temperature, "max_tokens": req.max_tokens, "stream": false,
         });
-        body["response_format"] = match &req.schema {
-            Some(s) => json!({"type": "json_schema", "json_schema": {"name": "plan", "schema": s}}),
-            None => json!({"type": "json_object"}),
-        };
+        if let Some(s) = &req.schema {
+            body["response_format"] = json!({"type": "json_schema", "json_schema": {"name": "plan", "schema": s}});
+        }
         let v = http::request(&self.url, "POST", &self.endpoint("/chat/completions"), Some(&body), self.timeout)?;
         let text = v["choices"][0]["message"]["content"].as_str().ok_or("reply without choices[0].message")?;
         Ok(Reply {

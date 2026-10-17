@@ -340,3 +340,21 @@ fn bench_failure_modes_are_handled() {
     let reqs = mock.requests.lock().unwrap();
     assert!(reqs[1].messages.last().unwrap().content.contains("no solid body"));
 }
+
+/// The real failure from the Phase 5 acceptance prompt: correct steps, then a repetition loop
+/// until the token limit. The complete steps are kept.
+#[test]
+fn truncated_replies_are_salvaged() {
+    let cut = r#"{"parameters":[{"expression":100,"name":"flange_d"},{"expression":10,"name":"flange_t"}],"steps":[{"command":"sketch.create","params":{"circles":[{"center":[0,0],"diameter":"flange_d"}],"plane":"XY"}},{"command":"solid.extrude","params":{"distance":"flange_t"}},{"command":"solid.hole","params":{"diameter":9,"points":[[40,0,"flange_t"],[0,40,"flange_t"]]}},{"command":"solid.hole","params":{"diameter":9,"points":[["40 * cos(0)", "40 * sin(0)", "flange_t"], ["40 * cos(0)", "40 * sin"#;
+    let p = plan::salvage(cut).expect("salvaged");
+    assert_eq!(p.steps.len(), 3);
+    // complete repeated steps after the good ones are dropped too
+    let looped = r#"{"steps":[{"command":"solid.box","params":{"size":[10,10,2]}},{"command":"solid.hole","params":{"diameter":3,"points":[[5,5,2]]}},{"command":"solid.hole","params":{"diameter":3,"points":[[1,1,2]]}},{"command":"solid.hole","params":{"diameter":3,"points":[[2,2"#;
+    assert_eq!(plan::salvage(looped).map(|p| p.steps.len()), Some(2));
+    assert_eq!(p.parameters.len(), 2);
+    assert!(plan::salvage("no json").is_none());
+    assert!(plan::salvage(r#"{"steps": [{"command": "solid.b"#).is_none());
+    // braces inside strings do not confuse it
+    let tricky = r#"{"summary": "a } b", "steps": [{"command": "solid.box", "params": {"size": [1, 2, 3]}}, {"command": "solid.box", "params": {"size": [1"#;
+    assert_eq!(plan::salvage(tricky).map(|p| p.steps.len()), Some(1));
+}
